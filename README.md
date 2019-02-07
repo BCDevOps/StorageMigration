@@ -1,7 +1,7 @@
 # Legacy Gluster Storage Migration
 
 
-###(Also Known As: Gluster Classic)
+### (Also Known As: Gluster Classic)
 
 Almost 3 years ago, the DevOps Platform Service began with Gluster Persistent Volumes and manual PV Provisioning. This work was done before the auto-provisioning storage classes were implemented (gluster-block, gluster-file, etc) and have been deprecated buy Container Native Storage (CNS).
 
@@ -9,7 +9,7 @@ Creation of new Gluster Classic PVs has been discontinued for some time and the 
 
 For most of the projects this is a straightforward migration to a freshly provisioned PVC. An update, and redeploy of a deployment configuration, and removal of the old PVC is all that is required.  The following documentation will walk through the manual steps you will need to perform for a basic storage migration.
 
-#Gluster Classic -> CNS
+# Gluster Classic -> CNS
 
 
 ## Project Space

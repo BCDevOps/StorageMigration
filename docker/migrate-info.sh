@@ -9,7 +9,7 @@ usage () {
 #------------------------------------------------------------------------
 
  Run the following command to copy your data:
-   cd /source; rsync . /target
+   cd /source; rsync -r . /target
 
 EOF
 }

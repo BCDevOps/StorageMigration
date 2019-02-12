@@ -17,7 +17,7 @@ items:
     source:
       type: Git
       git:
-        ref: "pvc-migrate-base"
+        ref: "master"
         uri: "https://github.com/BCDevOps/StorageMigration.git"
       contextDir: "docker"
     strategy:

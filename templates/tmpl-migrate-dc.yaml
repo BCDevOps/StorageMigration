@@ -1,0 +1,96 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: "migrate-base-template"
+  annotations:
+    description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
+    iconClass: icon-redis
+    tags: storage,migration
+parameters:
+- name: DC_NAME
+  description: "Name of the deployment config."
+  value: "pvc-migration"
+- name: SOURCE_PVC
+  description: "Name of an existing PVC to use as the content source."
+  required: true
+- name: TARGET_PVC
+  description: "Name of an existing PVC to use as the content target."
+  required: true
+- name: SLEEP_DURATION
+  description: "Value for the sleep command to keep the migration pod alive."
+  value: "1d"
+- name: IMAGESTREAM_NAME
+  value: pvc-migrate-base
+- name: IMAGESTREAM_TAG
+  value: latest
+- name: IMAGESTREAM_NAMESPACE
+  value: bcgov
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: ${DC_NAME}
+    labels:
+      app: ${DC_NAME}
+  spec:
+    replicas: 0
+    revisionHistoryLimit: 3
+    selector:
+      app: ${DC_NAME}
+      deploymentconfig: ${DC_NAME}
+    strategy:
+      activeDeadlineSeconds: 21600
+      recreateParams:
+        timeoutSeconds: 600
+      resources: {}
+      type: Recreate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: ${DC_NAME}
+          deploymentconfig: ${DC_NAME}
+      spec:
+        containers:
+        - env:
+          - name: SLEEP
+            value: ${SLEEP_DURATION}
+          image: ""
+          imagePullPolicy: Always
+          name: ${DC_NAME}
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /source
+            name: source
+          - mountPath: /target
+            name: target
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: source
+          persistentVolumeClaim:
+            claimName: ${SOURCE_PVC}
+        - name: target
+          persistentVolumeClaim:
+            claimName: ${TARGET_PVC}
+    test: false
+    triggers:
+    - imageChangeParams:
+        containerNames:
+        - ${DC_NAME}
+        from:
+          kind: ImageStreamTag
+          name: ${IMAGESTREAM_NAME}:${IMAGESTREAM_TAG}
+          namespace: ${IMAGESTREAM_NAMESPACE}
+      type: ImageChange
+  status:
+    availableReplicas: 0
+    latestVersion: 0
+    replicas: 0
+    unavailableReplicas: 0
+    updatedReplicas: 0

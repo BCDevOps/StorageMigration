@@ -26,11 +26,17 @@ objects:
   apiVersion: v1
   metadata:
     name: "${NAME}"
+    labels:
+      app: ${NAME}
 - kind: BuildConfig
   apiVersion: v1
   metadata:
     name: "${NAME}"
+    labels:
+      app: ${NAME}
   spec:
+    triggers:
+      - type: ConfigChange
     failedBuildsHistoryLimit: 1
     successfulBuildsHistoryLimit: 2
     runPolicy: Serial

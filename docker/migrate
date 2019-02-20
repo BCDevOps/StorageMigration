@@ -148,7 +148,7 @@ else
   echo "  Target Directory: ${TARGET_DIR}"
   echo
   waitForAnyKey
-  sync "SOURCE_DIR" "TARGET_DIR"
+  sync "${SOURCE_DIR}" "${TARGET_DIR}"
 fi
 # =================================================================================================================
 

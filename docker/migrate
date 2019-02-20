@@ -21,6 +21,10 @@ usage () {
 
     $0 [options]
 
+    When running in container mode.  Open a terminal to the container and run;
+
+      $0
+
   Standard Options:
   =================
 

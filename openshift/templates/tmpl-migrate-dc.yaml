@@ -4,10 +4,9 @@ metadata:
   name: "migrate-base-template"
   annotations:
     description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
-    iconClass: icon-redis
     tags: storage,migration
 parameters:
-- name: DC_NAME
+- name: NAME
   description: "Name of the deployment config."
   value: "pvc-migration"
 - name: SOURCE_PVC
@@ -19,25 +18,34 @@ parameters:
 - name: SLEEP_DURATION
   description: "Value for the sleep command to keep the migration pod alive."
   value: "1d"
-- name: IMAGESTREAM_NAME
-  value: pvc-migrate-base
-- name: IMAGESTREAM_TAG
-  value: latest
-- name: IMAGESTREAM_NAMESPACE
+- name: SOURCE_IMAGE_NAME
+  displayName: Source Image Name
+  description: The name of the image to use for this resource.
+  required: true
+  value: pvc-migration
+- name: SOURCE_IMAGE_NAMESPACE
+  displayName: Image Namespace
+  description: The namespace of the OpenShift project containing the imagestream for the application.
+  required: true
   value: bcgov
+- name: TAG_NAME
+  displayName: Environment TAG name
+  description: The TAG name for this environment, e.g., dev, test, prod
+  required: true
+  value: dev
 objects:
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
-    name: ${DC_NAME}
+    name: ${NAME}
     labels:
-      app: ${DC_NAME}
+      app: ${NAME}
   spec:
     replicas: 0
     revisionHistoryLimit: 3
     selector:
-      app: ${DC_NAME}
-      deploymentconfig: ${DC_NAME}
+      app: ${NAME}
+      deploymentconfig: ${NAME}
     strategy:
       activeDeadlineSeconds: 21600
       recreateParams:
@@ -48,8 +56,8 @@ objects:
       metadata:
         creationTimestamp: null
         labels:
-          app: ${DC_NAME}
-          deploymentconfig: ${DC_NAME}
+          app: ${NAME}
+          deploymentconfig: ${NAME}
       spec:
         containers:
         - env:
@@ -57,7 +65,7 @@ objects:
             value: ${SLEEP_DURATION}
           image: ""
           imagePullPolicy: Always
-          name: ${DC_NAME}
+          name: ${NAME}
           resources: {}
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
@@ -82,15 +90,9 @@ objects:
     triggers:
     - imageChangeParams:
         containerNames:
-        - ${DC_NAME}
+        - ${NAME}
         from:
           kind: ImageStreamTag
-          name: ${IMAGESTREAM_NAME}:${IMAGESTREAM_TAG}
-          namespace: ${IMAGESTREAM_NAMESPACE}
+          name: ${SOURCE_IMAGE_NAME}:${TAG_NAME}
+          namespace: ${SOURCE_IMAGE_NAMESPACE}
       type: ImageChange
-  status:
-    availableReplicas: 0
-    latestVersion: 0
-    replicas: 0
-    unavailableReplicas: 0
-    updatedReplicas: 0

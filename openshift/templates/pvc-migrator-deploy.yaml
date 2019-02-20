@@ -8,7 +8,7 @@ metadata:
 parameters:
 - name: NAME
   description: "Name of the deployment config."
-  value: "pvc-migration"
+  value: "pvc-migrator"
 - name: SOURCE_PVC
   description: "Name of an existing PVC to use as the content source."
   required: true
@@ -22,7 +22,7 @@ parameters:
   displayName: Source Image Name
   description: The name of the image to use for this resource.
   required: true
-  value: pvc-migration
+  value: pvc-migrator
 - name: SOURCE_IMAGE_NAMESPACE
   displayName: Image Namespace
   description: The namespace of the OpenShift project containing the imagestream for the application.

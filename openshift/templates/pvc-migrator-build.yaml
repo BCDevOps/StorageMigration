@@ -6,7 +6,7 @@ parameters:
   displayName: Name
   description: The name assigned to all of the resources defined in this template.
   required: true
-  value: pvc-migration
+  value: pvc-migrator
 - name: GIT_REPO_URL
   displayName: Git Repository URL
   description: The URL of the repository containing the code.

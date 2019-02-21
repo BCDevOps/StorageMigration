@@ -12,7 +12,9 @@ usage () {
 
   Steps:
     - Initialize the PVC migrator environment using the 'init' command.
-    - Migrate your PVC(s) using the migrate command.
+    - Deploy the build configuration using the 'build' command.
+    - Migrate your PVC(s) using the 'migrate' command.
+    - Remove the PVC migrator components from your environment(s) using the 'clean' command.
 
   Usage:
     $0 [options] [commands]
@@ -54,7 +56,10 @@ usage () {
   ========
     init
       - Initialize the PVC migrator environment for your project environment.
-        Specify your project namespace using the -n switch.
+        Specify your project namespace using the -n option.
+
+    build
+      - Deploy the PVC migrator build configuration.
 
     migrate <hostPodName> <pvcName> <pvcType> <pvcSize>
       - Migrate files from one PVC to another of the same name.
@@ -66,6 +71,10 @@ usage () {
         - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, gluster-file-db, or nfs-backup.
         - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
 
+    clean
+      - Remove the PVC migrator components from a given environment.
+        Specify the environment using the -e option.
+
 EOF
 exit 1
 }
@@ -73,6 +82,11 @@ exit 1
 # -----------------------------------------------------------------------------------------------------------------
 # Initialization:
 # -----------------------------------------------------------------------------------------------------------------
+
+# Default:
+# All of the commands other than init rely on local setting and parameters.
+export APPLY_LOCAL_SETTINGS=1
+
 while getopts n:r:b:p:Pe:lxh FLAG; do
   case $FLAG in
     # Init parameters
@@ -103,9 +117,9 @@ shift
 
 # Perform any special command initialization
 case "${_cmd}" in
-  migrate)
-    # The migrate command relies on local settings and parameter files
-    export APPLY_LOCAL_SETTINGS=1
+  init)
+    # All of the commands other than init rely on local setting and parameters.
+    unset APPLY_LOCAL_SETTINGS
     ;;
 esac
 
@@ -214,9 +228,6 @@ migrate(){
 
     # Delete the tmp PVC
     deletePVC "${_tmpPvcName}"
-
-    # Clean up; delete the migrator resources.
-    deleteMigrator
 
     echoWarning "\nPVC migration complete."
   )
@@ -386,6 +397,16 @@ case "${_cmd}" in
   init)
     requireProjectNamespace
     initialize
+    ;;
+
+  build)
+    echoWarning "\nDeploying the PVC Migrator build configuration.\nPlease wait for the build to complete before running any other command."
+    genBuilds.sh -l
+    ;;
+
+  clean)
+    requireDevelopmentEnvName
+    deleteMigrator
     ;;
 
   migrate)

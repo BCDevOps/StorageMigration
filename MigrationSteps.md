@@ -1,4 +1,31 @@
-# Basic Storage Migration Steps
+# Automated Storage Migration Steps
+
+The automated storage migration steps build on the [openshift-developer-tools](https://github.com/BCDevOps/openshift-developer-tools/tree/master/bin) scripts.  Make sure you have them installed and working on your machine.
+
+1. Initialize the PVC migrator environment using the 'init' command; for example:
+    ```
+    ./manage -n devex-von-image init
+    ```
+1. Deploy the build configuration using the 'build' command; for example:
+    ```
+    ./manage build
+    ```
+1. Migrate your PVC(s) using the 'migrate' command; for example:
+    ```
+    ./manage -e tools migrate jenkins jenkins-data gluster-block 5Gi
+    ```
+1. Remove the PVC migrator components from your environment(s) using the 'clean' command; for example:
+    ```
+    ./manage -e tools clean
+    ./manage -e dev clean
+    ...
+    ```
+For complete documentation refer to the `manage` script's documentation.
+```
+./manage -h
+```
+
+# Manual Storage Migration Steps
 
 ## Preparation
 

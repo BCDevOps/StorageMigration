@@ -1,0 +1,412 @@
+#!/bin/bash
+export MSYS_NO_PATHCONV=1
+SCRIPT_HOME="$( cd "$( dirname "$0" )" && pwd )"
+
+# =================================================================================================================
+# Usage:
+# -----------------------------------------------------------------------------------------------------------------
+usage () {
+  cat <<-EOF
+
+  A script to automate and manage the migration of files from one PVC to another of the same name within a given environment.
+
+  Steps:
+    - Initialize the PVC migrator environment using the 'init' command.
+    - Migrate your PVC(s) using the migrate command.
+
+  Usage:
+    $0 [options] [commands]
+
+  Examples:
+    $0 -n devex-von-image init
+    $0 -n devex-von-image -r https://github.com/WadeBarnes/StorageMigration.git init
+
+    $0 -e tools migrate jenkins jenkins-data gluster-block 5Gi
+
+  Options:
+  ========
+    -h prints the usage for the script
+
+    -e <Environment> the environment (tools/dev/test/prod) into which you are deploying (default: ${DEPLOYMENT_ENV_NAME})
+
+    -n Project namespace, the name of the target project minus the environment suffix (-tool, -dev, -test, -prod).
+       Used by the 'init' command to set the target project for all subsequent operations.
+
+    -r Optional - GitHub repository URL
+       Used by the 'init' command to set the GitHub for repository for all subsequent build operations.
+       Only used for build operations to redirect the source repository to another fork.
+
+    -b Optional - Git Branch
+       Used by the 'init' command to set the branch of the repository for all subsequent build operations.
+       Only used for build operations to redirect the source repository to another branch of a fork.
+
+    -l apply local settings and parameters
+       The migrate command will automatically set this option.
+
+    -p <profile> load a specific settings profile; setting.<profile>.sh
+
+    -P Use the default settings profile; settings.sh.  Use this flag to ignore all but the default
+       settings profile when there is more than one settings profile defined for a project.
+
+    -x run the script in debug mode to see what's happening
+
+  Commands:
+  ========
+    init
+      - Initialize the PVC migrator environment for your project environment.
+        Specify your project namespace using the -n switch.
+
+    migrate <hostPodName> <pvcName> <pvcType> <pvcSize>
+      - Migrate files from one PVC to another of the same name.
+        Good for migrating from one storage class to another, or to a new PVC of a different size.
+
+      - Required parameters:
+        - hostPodName: The friendly name of the host pod.  Typically, this is the same as the deployment configuration name.
+        - pvcName: The name of the PVC to be migrated.
+        - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, gluster-file-db, or nfs-backup.
+        - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
+
+EOF
+exit 1
+}
+
+# -----------------------------------------------------------------------------------------------------------------
+# Initialization:
+# -----------------------------------------------------------------------------------------------------------------
+while getopts n:r:b:p:Pe:lxh FLAG; do
+  case $FLAG in
+    # Init parameters
+    n) export PROJECT_NAMESPACE=$OPTARG ;;
+    r) export GIT_URI=$OPTARG ;;
+    b) export GIT_REF=$OPTARG ;;
+
+    # General parameters
+    p ) export PROFILE=$OPTARG ;;
+    P ) export IGNORE_PROFILES=1 ;;
+    e ) export DEPLOYMENT_ENV_NAME=$OPTARG ;;
+    l ) export APPLY_LOCAL_SETTINGS=1 ;;
+    x ) export DEBUG=1 ;;
+    h ) usage ;;
+
+    # Unrecognized option - show help
+    \? )
+      echo -e \\n"Invalid script option: -${OPTARG}"\\n
+      usage
+      ;;
+  esac
+done
+shift $((OPTIND-1))
+
+# Get the command
+_cmd=$(echo ${1} | tr '[:upper:]' '[:lower:]')
+shift
+
+# Perform any special command initialization
+case "${_cmd}" in
+  migrate)
+    # The migrate command relies on local settings and parameter files
+    export APPLY_LOCAL_SETTINGS=1
+    ;;
+esac
+
+if [ ! -z "${DEBUG}" ]; then
+  set -x
+fi
+
+# Check for required options ...
+if [ -z "${DEPLOYMENT_ENV_NAME}" ]; then
+  unset DEPLOYMENT_ENV_NAME_SET
+else
+  export DEPLOYMENT_ENV_NAME_SET=1
+fi
+
+if [ -z "${PROJECT_NAMESPACE}" ]; then
+  unset PROJECT_NAMESPACE_SET
+else
+  export PROJECT_NAMESPACE_SET=1
+fi
+
+# Load the project settings and functions ...
+_includeFile="ocFunctions.inc"
+_settingsFile="settings.sh"
+if [ ! -z $(type -p ${_includeFile}) ]; then
+  _includeFilePath=$(type -p ${_includeFile})
+  export OCTOOLSBIN=$(dirname ${_includeFilePath})
+
+  if [ -f ${OCTOOLSBIN}/${_settingsFile} ]; then
+    . ${OCTOOLSBIN}/${_settingsFile}
+  fi
+
+  if [ -f ${OCTOOLSBIN}/${_includeFile} ]; then
+    . ${OCTOOLSBIN}/${_includeFile}
+  fi
+else
+  _red='\033[0;31m'
+  _yellow='\033[1;33m'
+  _nc='\033[0m' # No Color
+  echo -e \\n"${_red}${_includeFile} could not be found on the path.${_nc}"
+  echo -e "${_yellow}Please ensure the openshift-developer-tools are installed on and registered on your path.${_nc}"
+  echo -e "${_yellow}https://github.com/BCDevOps/openshift-developer-tools${_nc}"
+fi
+
+# -----------------------------------------------------------------------------------------------------------------
+# Functions:
+# -----------------------------------------------------------------------------------------------------------------
+migrate(){
+  (
+    _hostName=${1}
+    _migratorPodName=${2}
+    _pvcName=${3}
+    _tmpPvcName=${_pvcName}-tmp
+    _pvcType=${4}
+    _pvcSize=${5}
+    _namespace=$(getProjectName)
+
+    printAndAskToContinue "Migration settings:\n  Project: ${_namespace}\n  Host: ${_hostName}\n  PVC to Migrate: ${_pvcName}\n  New PVC Type: ${_pvcType}\n  New PVC Size: ${_pvcSize}\n"
+
+    # Scale down the host pod
+    scaleDown ${_hostName}
+    printAndWait "Wait for the ${_hostName} pod to completely shut down before continuing."
+
+    # Create the tmp PVC
+    createPVC "${_tmpPvcName}" "${_pvcType}" "${_pvcSize}"
+    printAndWait "Wait for the ${_tmpPvcName} PVC to be created before continuing."
+
+    # Deploy the migrator pod
+    updateMigratorDeplymentParams "pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
+    deployMigrator
+    scaleUp ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
+
+    # Copy the files
+    syncPVCs "${_migratorPodName}" "/source/" "/target/"
+    printAndWait "Review the logs and ensure there were no errors before continuing."
+
+    # Scale down the migrator pod
+    scaleDown ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely shut down before continuing."
+
+    # Delete the original PVC
+    deletePVC "${_pvcName}"
+    printAndWait "Wait for the ${_pvcName} to be completely deleted before continuing."
+
+    # Create the new PVC
+    createPVC "${_pvcName}" "${_pvcType}" "${_pvcSize}"
+    printAndWait "Wait for the new ${_pvcName} PVC to be created before continuing."
+
+    # Reconfigure/redeploy the migrator pod
+    scaleUp ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
+
+    # Copy the files to the new PVC
+    syncPVCs "${_migratorPodName}" "/target/" "/source/"
+    printAndWait "Review the logs and ensure there were no errors before continuing."
+
+    # Scale down the migrator pod
+    scaleDown ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely shut down before continuing."
+
+    # Scale the host pod up
+    scaleUp ${_hostName}
+    printAndWait "Wait for the ${_hostName} pod to completely startup before continuing.  If there are issues cancel the script."
+
+    echoWarning "Cleaning up ..."
+
+    # Delete the tmp PVC
+    deletePVC "${_tmpPvcName}"
+
+    # Clean up; delete the migrator resources.
+    deleteMigrator
+
+    echoWarning "\nPVC migration complete."
+  )
+}
+
+updateMigratorDeplymentParams() {
+  (
+    _paramFile=${1:-./pvc-migrator-deploy.local.param}
+    _sourcePvc=${2}
+    _targetPvc=${3}
+    _imageTag=${4:-"latest"}
+
+    # Uncomment the required deployment settings ...
+    _parameterFilters="/TAG_NAME/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/SOURCE_IMAGE_NAMESPACE/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/SOURCE_PVC/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/TARGET_PVC/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}s~\(^TAG_NAME=\).*$~\1${_imageTag}~;"
+    _parameterFilters="${_parameterFilters}s~\(^SOURCE_PVC=\).*$~\1${_sourcePvc}~;"
+    _parameterFilters="${_parameterFilters}s~\(^TARGET_PVC=\).*$~\1${_targetPvc}~;"
+
+    cat ${_paramFile} | sed ${_parameterFilters} > ${_paramFile}.tmp
+    rm ${_paramFile}
+    mv ${_paramFile}.tmp ${_paramFile}
+  )
+}
+
+deployMigrator(){
+  (
+    genDepls.sh -l
+    oc rollout latest dc/pvc-migrator -n $(getProjectName)
+  )
+}
+
+deleteMigrator()
+{
+  (
+    oc -n $(getProjectName) delete all -l app=pvc-migrator
+  )
+}
+
+deletePVC(){
+  {
+    _pvcName=${1}
+    _namespace=$(getProjectName)
+    if [ -z "${_pvcName}" ]; then
+      echo -e \\n"deletePVC; Missing parameter!"\\n
+      exit 1
+    fi
+
+    printAndAskToContinue "If you contiune the ${_pvcName} PVC will be perminently deleted.  All data on the PVC will be lost."
+    oc -n ${_namespace} delete pvc ${_pvcName}
+  }
+}
+
+createPVC(){
+  (
+    _pvcName=${1}
+    _pvcType=${2}
+    _pvcSize=${3}
+    _namespace=$(getProjectName)
+
+    if [ -z "${_pvcName}" ] || [ -z "${_pvcType}" ] || [ -z "${_pvcSize}" ]; then
+      echo -e \\n"createPVC; Missing parameter!"\\n
+      exit 1
+    fi
+
+    oc -n ${_namespace} process --filename=./templates/pvc-template.json \
+               PERSISTENT_VOLUME_NAME=${_pvcName} \
+               PERSISTENT_VOLUME_CLASS=${_pvcType} \
+               PERSISTENT_VOLUME_SIZE=${_pvcSize} \
+               > pvc-deployment.json
+
+    oc -n ${_namespace} create -f pvc-deployment.json
+    rm pvc-deployment.json
+  )
+}
+
+syncPVCs(){
+  (
+    _migratorPodName=${1}
+    _source=${2:-"/source/"}
+    _target=${3:-"/target/"}
+
+    if [ -z "${_migratorPodName}" ]; then
+      echo -e \\n"syncPVCs; Missing parameter!"\\n
+      exit 1
+    fi
+
+    echo
+    runInContainer -v \
+    ${_migratorPodName} \
+    "/migrate -y -s ${_source} -t ${_target}"
+  )
+}
+
+deploymentEnvNameSet() {
+  if [ ! -z "${DEPLOYMENT_ENV_NAME_SET}" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+projectNamespaceSet() {
+  if [ ! -z "${PROJECT_NAMESPACE_SET}" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+requireProjectNamespace(){
+  _red='\033[0;31m'
+  _nc='\033[0m' # No Color
+
+  # Deployment Environment Name
+  if ! projectNamespaceSet; then
+    echo
+    echo -e "${_red}You MUST specify a project namespace using the '-n' flag.${_nc}"
+    usage
+    exit 1
+  fi
+}
+
+requireDevelopmentEnvName(){
+  _red='\033[0;31m'
+  _nc='\033[0m' # No Color
+
+  # Deployment Environment Name
+  if ! deploymentEnvNameSet; then
+    echo
+    echo -e "${_red}You MUST specify an environment name using the '-e' flag.${_nc}"
+    echo -e "${_red}Assuming a default would have unwanted consequences.${_nc}"
+    usage
+    exit 1
+  fi
+}
+
+initialize(){
+  echo -e "\nInitializing environment settings ...\n"
+
+  # Write a local settings file ...
+  echo "Writing local settings file (settings.local.sh) ..."
+  echo "export PROJECT_NAMESPACE=${PROJECT_NAMESPACE}" > settings.local.sh
+  echo "export GIT_URI=${GIT_URI}" >> settings.local.sh
+  echo "export GIT_REF=${GIT_REF}" >> settings.local.sh
+  # echo "export PROJECT_NAMESPACE=\${PROJECT_NAMESPACE:-${PROJECT_NAMESPACE}}" > settings.local.sh
+  # echo "export GIT_URI=\${GIT_URI:-${GIT_URI}}" >> settings.local.sh
+  # echo "export GIT_REF=\${GIT_REF:-${GIT_REF}}" >> settings.local.sh
+
+
+  # Generate local params files ...
+  echo "Generating local param files ..."
+  genTemplateParams.sh -lf
+
+  echo "Environment settings:"
+  echo "  Project namespace: ${PROJECT_NAMESPACE}"
+  echo "  Source Repository (used for optional builds): ${GIT_URI}"
+  echo "  Source branch (used for optional builds): ${GIT_REF}"
+}
+# =================================================================================================================
+
+pushd ${SCRIPT_HOME} >/dev/null
+
+case "${_cmd}" in
+  init)
+    requireProjectNamespace
+    initialize
+    ;;
+
+  migrate)
+    hostPodName=${1}
+    pvcName=${2}
+    pvcType=${3}
+    pvcSize=${4}
+
+    if [ -z "${hostPodName}" ] || [ -z "${pvcName}" ] || [ -z "${pvcType}" ] || [ -z "${pvcSize}" ]; then
+      echoWarning "\n${_cmd}; Missing one or more required parameters."
+      usage
+      exit 1
+    fi
+
+    requireDevelopmentEnvName
+    migrate "${hostPodName}" "pvc-migrator" "${pvcName}" "${pvcType}" "${pvcSize}"
+    ;;
+  *)
+    echoWarning "Unrecognized command; ${_cmd}"
+    usage
+    ;;
+esac
+
+popd >/dev/null

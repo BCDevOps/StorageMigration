@@ -6,6 +6,8 @@ The the PVC created by the scripts will match the name of the original PVC, ther
 
 **It's always a good idea to make sure you have recent and validated backups of all of your data before you continue.**
 
+**Tip:** The `scaleDown` and `scaleUp` commands provided by the `manage` script can be used to scale other application pods.  For example; if you are migrating the PVC for a PostgreSQL instance, you may want to scale the application pods that depend on the database service before and after you perform the migration.
+
 1. Initialize the PVC migrator environment using the 'init' command; for example:
     ```
     ./manage -n devex-von-image init

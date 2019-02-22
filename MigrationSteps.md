@@ -1,4 +1,37 @@
-# Basic Storage Migration Steps
+# Automated Storage Migration Steps
+
+The automated storage migration steps build on the [openshift-developer-tools](https://github.com/BCDevOps/openshift-developer-tools/tree/master/bin) scripts.  Make sure you have them installed and working on your machine.
+
+The the PVC created by the scripts will match the name of the original PVC, therefore there will be no impact to existing references.  If you have decided to change the storage class or size of your PVC, you will need to update any templates and/or parameter files (infrastructure as code files) to match.
+
+**It's always a good idea to make sure you have recent and validated backups of all of your data before you continue.**
+
+**Tip:** The `scaleDown` and `scaleUp` commands provided by the `manage` script can be used to scale other application pods.  For example; if you are migrating the PVC for a PostgreSQL instance, you may want to scale the application pods that depend on the database service before and after you perform the migration.
+
+1. Initialize the PVC migrator environment using the 'init' command; for example:
+    ```
+    ./manage -n devex-von-image init
+    ```
+1. Deploy the build configuration using the 'build' command; for example:
+    ```
+    ./manage build
+    ```
+1. Migrate your PVC(s) using the 'migrate' command; for example:
+    ```
+    ./manage -e tools migrate jenkins jenkins-data gluster-block 5Gi
+    ```
+1. Remove the PVC migrator components from your environment(s) using the 'clean' command; for example:
+    ```
+    ./manage -e tools clean
+    ./manage -e dev clean
+    ...
+    ```
+For complete documentation refer to the `manage` script's documentation.
+```
+./manage -h
+```
+
+# Manual Storage Migration Steps
 
 ## Preparation
 

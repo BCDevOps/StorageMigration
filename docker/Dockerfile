@@ -8,7 +8,7 @@ WORKDIR /
 RUN yum -y install rsync && yum clean all -y
 
 RUN mkdir /source /target
-COPY migrate-info.sh /
+COPY migrate /
 
 # Set the default CMD to print the usage and sleep for ${SLEEP}
-CMD sh /migrate-info.sh
+CMD sh /migrate -r

@@ -68,7 +68,7 @@ usage () {
       - Required parameters:
         - hostPodName: The friendly name of the host pod.  Typically, this is the same as the deployment configuration name.
         - pvcName: The name of the PVC to be migrated.
-        - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, gluster-file-db, or nfs-backup.
+        - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, or gluster-file-db.
         - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
 
     clean

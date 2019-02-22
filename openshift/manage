@@ -61,6 +61,16 @@ usage () {
     build
       - Deploy the PVC migrator build configuration.
 
+    scaleDown
+      - Scale down one or more pods.
+        For example;
+          $0 -e dev scaleDown django
+
+    scaleUp
+      - Scale up one or more pods.
+        For example;
+          $0 -e dev scaleUp django
+
     migrate <hostPodName> <pvcName> <pvcType> <pvcSize>
       - Migrate files from one PVC to another of the same name.
         Good for migrating from one storage class to another, or to a new PVC of a different size.
@@ -411,6 +421,16 @@ case "${_cmd}" in
 
     requireDevelopmentEnvName
     deleteMigrator ${migratorName}
+    ;;
+
+  scaleup)
+    requireDevelopmentEnvName
+    scaleUp ${@}
+    ;;
+
+  scaledown)
+    requireDevelopmentEnvName
+    scaleDown ${@}
     ;;
 
   migrate)

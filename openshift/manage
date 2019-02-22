@@ -183,12 +183,12 @@ migrate(){
     printAndWait "Wait for the ${_hostName} pod to completely shut down before continuing."
 
     # Create the tmp PVC
-    createPVC "${_tmpPvcName}" "${_pvcType}" "${_pvcSize}"
+    createPVC "${_tmpPvcName}" "${_pvcType}" "${_pvcSize}" "${_hostName}"
     printAndWait "Wait for the ${_tmpPvcName} PVC to be created before continuing."
 
     # Deploy the migrator pod
     updateMigratorDeplymentParams "pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
-    deployMigrator
+    deployMigrator ${_migratorPodName}
     scaleUp ${_migratorPodName}
     printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
 
@@ -205,7 +205,7 @@ migrate(){
     printAndWait "Wait for the ${_pvcName} to be completely deleted before continuing."
 
     # Create the new PVC
-    createPVC "${_pvcName}" "${_pvcType}" "${_pvcSize}"
+    createPVC "${_pvcName}" "${_pvcType}" "${_pvcSize}" "${_hostName}"
     printAndWait "Wait for the new ${_pvcName} PVC to be created before continuing."
 
     # Reconfigure/redeploy the migrator pod
@@ -222,7 +222,7 @@ migrate(){
 
     # Scale the host pod up
     scaleUp ${_hostName}
-    printAndWait "Wait for the ${_hostName} pod to completely startup before continuing.  If there are issues cancel the script."
+    printAndWait "Wait for the ${_hostName} pod to completely startup before continuing.  If there are issues cancel (Ctrl-C) the script."
 
     echoWarning "Cleaning up ..."
 
@@ -257,15 +257,19 @@ updateMigratorDeplymentParams() {
 
 deployMigrator(){
   (
+    _migratorName=${1:-pvc-migrator}
+
     genDepls.sh -l
-    oc rollout latest dc/pvc-migrator -n $(getProjectName)
+    oc rollout latest dc/${_migratorName} -n $(getProjectName)
   )
 }
 
 deleteMigrator()
 {
   (
-    oc -n $(getProjectName) delete all -l app=pvc-migrator
+    _migratorName=${1:-pvc-migrator}
+
+    oc -n $(getProjectName) delete all -l app=${_migratorName}
   )
 }
 
@@ -288,14 +292,16 @@ createPVC(){
     _pvcName=${1}
     _pvcType=${2}
     _pvcSize=${3}
+    _appName=${4}
     _namespace=$(getProjectName)
 
-    if [ -z "${_pvcName}" ] || [ -z "${_pvcType}" ] || [ -z "${_pvcSize}" ]; then
+    if [ -z "${_appName}" ] || [ -z "${_pvcName}" ] || [ -z "${_pvcType}" ] || [ -z "${_pvcSize}" ]; then
       echo -e \\n"createPVC; Missing parameter!"\\n
       exit 1
     fi
 
     oc -n ${_namespace} process --filename=./templates/pvc-template.json \
+               NAME=${_appName} \
                PERSISTENT_VOLUME_NAME=${_pvcName} \
                PERSISTENT_VOLUME_CLASS=${_pvcType} \
                PERSISTENT_VOLUME_SIZE=${_pvcSize} \
@@ -375,10 +381,6 @@ initialize(){
   echo "export PROJECT_NAMESPACE=${PROJECT_NAMESPACE}" > settings.local.sh
   echo "export GIT_URI=${GIT_URI}" >> settings.local.sh
   echo "export GIT_REF=${GIT_REF}" >> settings.local.sh
-  # echo "export PROJECT_NAMESPACE=\${PROJECT_NAMESPACE:-${PROJECT_NAMESPACE}}" > settings.local.sh
-  # echo "export GIT_URI=\${GIT_URI:-${GIT_URI}}" >> settings.local.sh
-  # echo "export GIT_REF=\${GIT_REF:-${GIT_REF}}" >> settings.local.sh
-
 
   # Generate local params files ...
   echo "Generating local param files ..."
@@ -405,8 +407,10 @@ case "${_cmd}" in
     ;;
 
   clean)
+    migratorName=${1:-pvc-migrator}
+
     requireDevelopmentEnvName
-    deleteMigrator
+    deleteMigrator ${migratorName}
     ;;
 
   migrate)
@@ -414,6 +418,8 @@ case "${_cmd}" in
     pvcName=${2}
     pvcType=${3}
     pvcSize=${4}
+    migratorName=${5:-pvc-migrator}
+
 
     if [ -z "${hostPodName}" ] || [ -z "${pvcName}" ] || [ -z "${pvcType}" ] || [ -z "${pvcSize}" ]; then
       echoWarning "\n${_cmd}; Missing one or more required parameters."
@@ -422,7 +428,7 @@ case "${_cmd}" in
     fi
 
     requireDevelopmentEnvName
-    migrate "${hostPodName}" "pvc-migrator" "${pvcName}" "${pvcType}" "${pvcSize}"
+    migrate "${hostPodName}" "${migratorName}" "${pvcName}" "${pvcType}" "${pvcSize}"
     ;;
   *)
     echoWarning "Unrecognized command; ${_cmd}"

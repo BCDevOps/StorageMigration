@@ -11,7 +11,7 @@
       "metadata": {
         "name": "${PERSISTENT_VOLUME_NAME}",
         "labels": {
-          "app": "${PERSISTENT_VOLUME_NAME}"
+          "app": "${NAME}"
         }
       },
       "spec": {
@@ -29,6 +29,13 @@
   ],
   "parameters": [
     {
+      "name": "NAME",
+      "displayName": "Name",
+      "description": "The name (and app label) assigned to all of the resources defined in this template.",
+      "required": true,
+      "value": "backup"
+    },
+    {
       "name": "PERSISTENT_VOLUME_NAME",
       "displayName": "Persistent Volume Name",
       "description": "The name of the persistent volume associated with the deployment.",
@@ -45,7 +52,7 @@
     {
       "name": "PERSISTENT_VOLUME_CLASS",
       "displayName": "Persistent Volume Class name",
-      "description": "The class of the volume; gluster-file, gluster-block, gluster-file-db, nfs-backup.  nfs-backup requires some manual configuration; https://github.com/BCDevOps/provision-nfs-apb",
+      "description": "The class of the volume; gluster-file, gluster-block, gluster-file-db.",
       "required": false,
       "value": "gluster-file"
     }

@@ -12,7 +12,7 @@ usage () {
   destination PVCs are mounted to /source/ and /target/ respectively.
 
   When run in container mode the script will sleep for ${SLEEP} to keep
-  the conatiner alive while you run the script in it's default sync mode
+  the container alive while you run the script in it's default sync mode
   to copy all of the files from one PVC to another.
   --------------------------------------------------------------------------------------
   

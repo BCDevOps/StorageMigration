@@ -3,11 +3,11 @@
 
 ### (Also Known As: Gluster Classic)
 
-Almost 3 years ago, the DevOps Platform Service began with Gluster Persistent Volumes and manual PV Provisioning. This work was done before the auto-provisioning storage classes were implemented (gluster-block, gluster-file, etc) and have been deprecated buy Container Native Storage (CNS).
+Almost 3 years ago, the DevOps Platform Service began with Gluster Persistent Volumes and manual PV Provisioning. This work was done before the auto-provisioning storage classes were implemented (gluster-block, gluster-file, etc) and have been deprecated by Container Native Storage (CNS).
 
-Creation of new Gluster Classic PVs has been discontinued for some time and the next step to complete the discontinuation by migrating the remaining PVs to auto-provisioned CNS or alternative storage options that will be supported going forward.
+Creation of new Gluster Classic PVs has been discontinued for some time and the next step to complete the discontinuation by migrating the remaining PVs to auto-provisioned CNS or alternative storage options that will be supported going forward.  The goal is to avoid having to allocate budget in the next fiscal year for this legacy storage (Targeting *March 31, 2019* for all migrations completed)
 
-For most of the projects this is a straightforward migration to a freshly provisioned PVC. An update, and redeploy of a deployment configuration, and removal of the old PVC is all that is required.  The following documentation will walk through the manual steps you will need to perform for a basic storage migration.
+For most of the projects this is a straightforward migration to a freshly provisioned PVC. An update, and redeploy of a deployment configuration, and removal of the old PVC is all that is required.  The following documentation will walk through the manual steps you will need to perform for a basic storage migration.  There are also community contributions to this repository that support automatically migrating to a new volume of the same name (through a 2 step process).
 
 # Gluster Classic -> CNS
 

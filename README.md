@@ -14,7 +14,7 @@ For most of the projects this is a straightforward migration to a freshly provis
 
 ## Project Space
 
-If you've reading this, you have hopefully received an email about the need to migrate off of any legacy storage.  This project space contains "How to" documentation and will be tracking the progress of the migration using GitHub Issues.
+If you're reading this, you have hopefully received an email about the need to migrate off of any legacy storage.  This project space contains "How to" documentation and will be tracking the progress of the migration using GitHub Issues.
 
 The [issues](https://github.com/BCDevOps/StorageMigration/issues) in this repository will also be monitored and updated by the BCGov DevOps Support teams for tracking and assistance.  While there is a Slack channel (#StorageMigration) that will be used for most communication, historical detail and information for individual Project migrations should be added to the Issue to avoid loss of information during the project.
 

@@ -2,7 +2,7 @@
 
 The automated storage migration steps build on the [openshift-developer-tools](https://github.com/BCDevOps/openshift-developer-tools/tree/master/bin) scripts.  Make sure you have them installed and working on your machine.
 
-The the PVC created by the scripts will match the name of the original PVC, therefore there will be no impact to existing references.  If you have decided to change the storage class or size of your PVC, you will need to update any templates and/or parameter files (infrastructure as code files) to match.
+The PVC created by the scripts will match the name of the original PVC, therefore there will be no impact to existing references.  If you have decided to change the storage class or size of your PVC, you will need to update any templates and/or parameter files (infrastructure as code files) to match.
 
 **It's always a good idea to make sure you have recent and validated backups of all of your data before you continue.**
 

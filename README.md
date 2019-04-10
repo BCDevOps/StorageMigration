@@ -16,10 +16,12 @@ For most of the projects this is a straightforward migration to a freshly provis
 
 If you're reading this, you have hopefully received an email about the need to migrate off of any legacy storage.  This project space contains "How to" documentation and will be tracking the progress of the migration using GitHub Issues.
 
-The [issues](https://github.com/BCDevOps/StorageMigration/issues) in this repository will also be monitored and updated by the BCGov DevOps Support teams for tracking and assistance.  While there is a Slack channel (#StorageMigration) that will be used for most communication, historical detail and information for individual Project migrations should be added to the Issue to avoid loss of information during the project.
+The [issues](https://github.com/BCDevOps/StorageMigration/issues) in this repository will also be monitored and updated by the BCGov DevOps Support teams for tracking and assistance.  While there is a Rocket.Chat channel [#devops-storage-migration](https://chat.pathfinder.gov.bc.ca/channel/devops-storage-migration) that will be a communication and help request resource.  Historical detail and information for individual Project migrations should be added to the Issue to avoid loss of information during the project.
 
 ## Where to find more
 
 Github project: [BCDevOps/StorageMigration](https://github.com/BCDevOps/StorageMigration)
+
+Rocket.Chat channel: [#devops-storage-migration](https://chat.pathfinder.gov.bc.ca/channel/devops-storage-migration)
 
 Migration Walkthrough: [MigrationSteps](./MigrationSteps.md)

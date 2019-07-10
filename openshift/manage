@@ -81,6 +81,13 @@ usage () {
         - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, or gluster-file-db.
         - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
 
+    copy <sourcePvcName> <targetPvcName>
+      - Copy files from one existing PVC to another exiting PVC.
+
+      - Required parameters:
+        - sourcePvcName: The name of the existing source PVC.
+        - targetPvcName: The name of the existing target PVC.
+
     clean
       - Remove the PVC migrator components from a given environment.
         Specify the environment using the -e option.
@@ -243,6 +250,34 @@ migrate(){
   )
 }
 
+copy(){
+  (
+    _migratorPodName=${1}
+    _sourcePvcName=${2}
+    _targetPvcName=${3}
+    _namespace=$(getProjectName)
+
+    printAndAskToContinue "Copy settings:\n  Project: ${_namespace}\n  Source PVC: ${_sourcePvcName}\n  Target PVC: ${_targetPvcName}\n"
+    printAndWait "Make sure there are no running pods connected to the source and target PVCs."
+
+    # Deploy the migrator pod
+    updateMigratorDeplymentParams "pvc-migrator-deploy.local.param" "${_sourcePvcName}" "${_targetPvcName}" "latest"
+    deployMigrator ${_migratorPodName}
+    scaleUp ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
+
+    # Copy the files
+    syncPVCs "${_migratorPodName}" "/source/" "/target/"
+    printAndWait "Review the logs and ensure there were no errors before continuing."
+
+    # Scale down the migrator pod
+    scaleDown ${_migratorPodName}
+    printAndWait "Wait for the ${_migratorPodName} pod to completely shut down before continuing."
+
+    echoWarning "\nCopy complete."
+  )
+}
+
 updateMigratorDeplymentParams() {
   (
     _paramFile=${1:-./pvc-migrator-deploy.local.param}
@@ -269,7 +304,13 @@ deployMigrator(){
   (
     _migratorName=${1:-pvc-migrator}
 
-    genDepls.sh -l
+    # Deploy or update the configuration ...
+    if dcExists ${_migratorName}; then
+      genDepls.sh -u -l
+    else
+      genDepls.sh -l
+    fi 
+
     oc rollout latest dc/${_migratorName} -n $(getProjectName)
   )
 }
@@ -450,6 +491,22 @@ case "${_cmd}" in
     requireDevelopmentEnvName
     migrate "${hostPodName}" "${migratorName}" "${pvcName}" "${pvcType}" "${pvcSize}"
     ;;
+
+  copy)
+    sourcePvcName=${1}
+    targetPvcName=${2}
+    migratorName=${3:-pvc-migrator}
+
+    if [ -z "${sourcePvcName}" ] || [ -z "${targetPvcName}" ]; then
+      echoWarning "\n${_cmd}; Missing one or more required parameters."
+      usage
+      exit 1
+    fi
+
+    requireDevelopmentEnvName
+    copy "${migratorName}" "${sourcePvcName}" "${targetPvcName}"
+    ;;
+
   *)
     echoWarning "Unrecognized command; ${_cmd}"
     usage

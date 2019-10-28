@@ -132,8 +132,8 @@ onUsesCommandLineArguments() {
 # Initialization:
 # -----------------------------------------------------------------------------------------------------------------
 
-# This is required for the scripts to run correctly during the first run.
-# If no dummy settings.local.sh is provided, the initialization above will fail due to 
+# An empty settings.local.sh is required for the scripts to run correctly during the first run.
+# If no settings.local.sh is provided, the initialization above will fail due to 
 # the environment variable APPLY_LOCAL_SETTING set to 1.
 # Similarly, if the environment variable is not set, the initialize script will NOT
 # correctly create the local settings file

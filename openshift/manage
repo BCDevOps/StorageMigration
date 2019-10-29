@@ -79,7 +79,6 @@ usage () {
         Specify the environment using the -e option.
 
 EOF
-exit 1
 }
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -388,7 +387,7 @@ requireProjectNamespace(){
   if ! projectNamespaceSet; then
     echo
     echo -e "${_red}You MUST specify a project namespace using the '-n' flag.${_nc}"
-    usage
+    globalUsage
     exit 1
   fi
 }
@@ -402,7 +401,7 @@ requireDevelopmentEnvName(){
     echo
     echo -e "${_red}You MUST specify an environment name using the '-e' flag.${_nc}"
     echo -e "${_red}Assuming a default would have unwanted consequences.${_nc}"
-    usage
+    globalUsage
     exit 1
   fi
 }
@@ -444,7 +443,6 @@ case "${_cmd}" in
 
   clean)
     migratorName=${1:-pvc-migrator}
-
     requireDevelopmentEnvName
     deleteMigrator ${migratorName}
     ;;
@@ -466,10 +464,9 @@ case "${_cmd}" in
     pvcSize=${4}
     migratorName=${5:-pvc-migrator}
 
-
     if [ -z "${hostPodName}" ] || [ -z "${pvcName}" ] || [ -z "${pvcType}" ] || [ -z "${pvcSize}" ]; then
       echoWarning "\n${_cmd}; Missing one or more required parameters."
-      usage
+      globalUsage
       exit 1
     fi
 
@@ -484,7 +481,7 @@ case "${_cmd}" in
 
     if [ -z "${sourcePvcName}" ] || [ -z "${targetPvcName}" ]; then
       echoWarning "\n${_cmd}; Missing one or more required parameters."
-      usage
+      globalUsage
       exit 1
     fi
 
@@ -494,7 +491,7 @@ case "${_cmd}" in
 
   *)
     echoWarning "Unrecognized command; ${_cmd}"
-    usage
+    globalUsage
     ;;
 esac
 

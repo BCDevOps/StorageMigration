@@ -27,10 +27,6 @@ usage () {
 
   Options:
   ========
-    -h prints the usage for the script
-
-    -e <Environment> the environment (tools/dev/test/prod) into which you are deploying (default: ${DEPLOYMENT_ENV_NAME})
-
     -n Project namespace, the name of the target project minus the environment suffix (-tool, -dev, -test, -prod).
        Used by the 'init' command to set the target project for all subsequent operations.
 
@@ -41,16 +37,6 @@ usage () {
     -b Optional - Git Branch
        Used by the 'init' command to set the branch of the repository for all subsequent build operations.
        Only used for build operations to redirect the source repository to another branch of a fork.
-
-    -l apply local settings and parameters
-       The migrate command will automatically set this option.
-
-    -p <profile> load a specific settings profile; setting.<profile>.sh
-
-    -P Use the default settings profile; settings.sh.  Use this flag to ignore all but the default
-       settings profile when there is more than one settings profile defined for a project.
-
-    -x run the script in debug mode to see what's happening
 
   Commands:
   ========
@@ -93,7 +79,6 @@ usage () {
         Specify the environment using the -e option.
 
 EOF
-exit 1
 }
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -101,61 +86,57 @@ exit 1
 # -----------------------------------------------------------------------------------------------------------------
 
 # Default:
-# All of the commands other than init rely on local setting and parameters.
+# All of the commands rely on local setting and parameters.
 export APPLY_LOCAL_SETTINGS=1
 
-while getopts n:r:b:p:Pe:lxh FLAG; do
-  case $FLAG in
-    # Init parameters
-    n) export PROJECT_NAMESPACE=$OPTARG ;;
-    r) export GIT_URI=$OPTARG ;;
-    b) export GIT_REF=$OPTARG ;;
+# =================================================================================================================
+# Process the local command line arguments and pass everything else along.
+# - The 'getopts' options string must start with ':' for this to work.
+# -----------------------------------------------------------------------------------------------------------------
+while [ ${OPTIND} -le $# ]; do
+  if getopts :n:r:b: FLAG; then
+    case ${FLAG} in
+      # List of local options:
+      n) PROJECT_NAMESPACE=$OPTARG ;;
+      r) GIT_URI=$OPTARG ;;
+      b) GIT_REF=$OPTARG ;;
 
-    # General parameters
-    p ) export PROFILE=$OPTARG ;;
-    P ) export IGNORE_PROFILES=1 ;;
-    e ) export DEPLOYMENT_ENV_NAME=$OPTARG ;;
-    l ) export APPLY_LOCAL_SETTINGS=1 ;;
-    x ) export DEBUG=1 ;;
-    h ) usage ;;
-
-    # Unrecognized option - show help
-    \? )
-      echo -e \\n"Invalid script option: -${OPTARG}"\\n
-      usage
-      ;;
-  esac
+      # Pass unrecognized options ...
+      \?) pass+=" -${OPTARG}" ;;
+    esac
+  else
+    # Pass unrecognized arguments ...
+    pass+=" ${!OPTIND}"
+    let OPTIND++
+  fi
 done
+
+# Pass the unrecognized arguments along for further processing ...
 shift $((OPTIND-1))
+set -- "$@" $(echo -e "${pass}" | sed -e 's/^[[:space:]]*//')
+# =================================================================================================================
 
-# Get the command
-_cmd=$(echo ${1} | tr '[:upper:]' '[:lower:]')
-shift
+# -----------------------------------------------------------------------------------------------------------------
+# Define hook scripts:
+# - These must be defined before the main settings script 'settings.sh' is loaded.
+# -----------------------------------------------------------------------------------------------------------------
+onUsesCommandLineArguments() {
+  (
+    # This script is expecting command line arguments to be passed ...
+    return 0
+  )
+}
 
-# Perform any special command initialization
-case "${_cmd}" in
-  init)
-    # All of the commands other than init rely on local setting and parameters.
-    unset APPLY_LOCAL_SETTINGS
-    ;;
-esac
+# -----------------------------------------------------------------------------------------------------------------
+# Initialization:
+# -----------------------------------------------------------------------------------------------------------------
 
-if [ ! -z "${DEBUG}" ]; then
-  set -x
-fi
-
-# Check for required options ...
-if [ -z "${DEPLOYMENT_ENV_NAME}" ]; then
-  unset DEPLOYMENT_ENV_NAME_SET
-else
-  export DEPLOYMENT_ENV_NAME_SET=1
-fi
-
-if [ -z "${PROJECT_NAMESPACE}" ]; then
-  unset PROJECT_NAMESPACE_SET
-else
-  export PROJECT_NAMESPACE_SET=1
-fi
+# An empty settings.local.sh is required for the scripts to run correctly during the first run.
+# If no settings.local.sh is provided, the initialization above will fail due to 
+# the environment variable APPLY_LOCAL_SETTING set to 1.
+# Similarly, if the environment variable is not set, the initialize script will NOT
+# correctly create the local settings file
+touch settings.local.sh
 
 # Load the project settings and functions ...
 _includeFile="ocFunctions.inc"
@@ -179,6 +160,7 @@ else
   echo -e "${_yellow}Please ensure the openshift-developer-tools are installed on and registered on your path.${_nc}"
   echo -e "${_yellow}https://github.com/BCDevOps/openshift-developer-tools${_nc}"
 fi
+
 
 # -----------------------------------------------------------------------------------------------------------------
 # Functions:
@@ -382,7 +364,7 @@ syncPVCs(){
 }
 
 deploymentEnvNameSet() {
-  if [ ! -z "${DEPLOYMENT_ENV_NAME_SET}" ]; then
+  if [ ! -z "${DEPLOYMENT_ENV_NAME}" ]; then
     return 0
   else
     return 1
@@ -390,7 +372,7 @@ deploymentEnvNameSet() {
 }
 
 projectNamespaceSet() {
-  if [ ! -z "${PROJECT_NAMESPACE_SET}" ]; then
+  if [ ! -z "${PROJECT_NAMESPACE}" ] && [ "bcgov" != "${PROJECT_NAMESPACE}" ]; then
     return 0
   else
     return 1
@@ -405,7 +387,7 @@ requireProjectNamespace(){
   if ! projectNamespaceSet; then
     echo
     echo -e "${_red}You MUST specify a project namespace using the '-n' flag.${_nc}"
-    usage
+    globalUsage
     exit 1
   fi
 }
@@ -419,7 +401,7 @@ requireDevelopmentEnvName(){
     echo
     echo -e "${_red}You MUST specify an environment name using the '-e' flag.${_nc}"
     echo -e "${_red}Assuming a default would have unwanted consequences.${_nc}"
-    usage
+    globalUsage
     exit 1
   fi
 }
@@ -445,6 +427,8 @@ initialize(){
 # =================================================================================================================
 
 pushd ${SCRIPT_HOME} >/dev/null
+_cmd=$(toLower ${1})
+shift
 
 case "${_cmd}" in
   init)
@@ -459,7 +443,6 @@ case "${_cmd}" in
 
   clean)
     migratorName=${1:-pvc-migrator}
-
     requireDevelopmentEnvName
     deleteMigrator ${migratorName}
     ;;
@@ -481,10 +464,9 @@ case "${_cmd}" in
     pvcSize=${4}
     migratorName=${5:-pvc-migrator}
 
-
     if [ -z "${hostPodName}" ] || [ -z "${pvcName}" ] || [ -z "${pvcType}" ] || [ -z "${pvcSize}" ]; then
       echoWarning "\n${_cmd}; Missing one or more required parameters."
-      usage
+      globalUsage
       exit 1
     fi
 
@@ -499,7 +481,7 @@ case "${_cmd}" in
 
     if [ -z "${sourcePvcName}" ] || [ -z "${targetPvcName}" ]; then
       echoWarning "\n${_cmd}; Missing one or more required parameters."
-      usage
+      globalUsage
       exit 1
     fi
 
@@ -509,7 +491,7 @@ case "${_cmd}" in
 
   *)
     echoWarning "Unrecognized command; ${_cmd}"
-    usage
+    globalUsage
     ;;
 esac
 

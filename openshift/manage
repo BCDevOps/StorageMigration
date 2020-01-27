@@ -186,7 +186,7 @@ migrate(){
     printAndWait "Wait for the ${_tmpPvcName} PVC to be created before continuing."
 
     # Deploy the migrator pod
-    updateMigratorDeplymentParams "pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
+    updateMigratorDeplymentParams "./templates/pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
     deployMigrator ${_migratorPodName}
     scaleUp ${_migratorPodName}
     printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
@@ -243,7 +243,7 @@ copy(){
     printAndWait "Make sure there are no running pods connected to the source and target PVCs."
 
     # Deploy the migrator pod
-    updateMigratorDeplymentParams "pvc-migrator-deploy.local.param" "${_sourcePvcName}" "${_targetPvcName}" "latest"
+    updateMigratorDeplymentParams "./templates/pvc-migrator-deploy.local.param" "${_sourcePvcName}" "${_targetPvcName}" "latest"
     deployMigrator ${_migratorPodName}
     scaleUp ${_migratorPodName}
     printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
@@ -262,7 +262,7 @@ copy(){
 
 updateMigratorDeplymentParams() {
   (
-    _paramFile=${1:-./pvc-migrator-deploy.local.param}
+    _paramFile=${1:-./templates/pvc-migrator-deploy.local.param}
     _sourcePvc=${2}
     _targetPvc=${3}
     _imageTag=${4:-"latest"}

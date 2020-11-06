@@ -73,9 +73,9 @@ Note that the script within does not manage storage consumption. Please plan acc
 
    Don't forget to save the config
 
-### the following steps cover how the migrator pod will setup the same pvc on the target cluster and then
-### it will oc rsync the contents of the pvc selected, to the pv on the target cluster.
-### It will do this by spawning a migrator pod on the target cluster and receiving the rsync.
+-  the following steps cover how the migrator pod will setup the same pvc on the target cluster and then
+-  it will oc rsync the contents of the pvc selected, to the pv on the target cluster.
+-  It will do this by spawning a migrator pod on the target cluster and receiving the rsync.
 
    `rsync -IOrlzhv --no-times --no-perms --safe-links <source path from PV mount> <target path in target PV mount>`
    

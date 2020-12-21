@@ -1,11 +1,11 @@
-FROM registry.access.redhat.com/openshift3/ose-cli:v3.11.59
+FROM quay.io/openshift/origin-cli:latest
 
 LABEL maintainer="Jeff Kelly <jeff.kelly@arctiq.ca>
 LABEL io.k8s.description="Storage Migration Placeholder"
 
 WORKDIR /
 
-RUN yum -y install rsync && yum clean all -y
+RUN yum -y install rsync curl && yum clean all -y
 
 RUN mkdir /source /target
 COPY migrate /

@@ -8,6 +8,6 @@ Automation now exists to migrate stateful data within the same cluster, and a wa
 
 Github project: [BCDevOps/StorageMigration](https://github.com/BCDevOps/StorageMigration)
 
-Automation Migration Walkthrough: [MigrationSteps](https://github.com/BCDevOps/StorageMigration/MigrationSteps.md)
+Automation Migration Walkthrough: [MigrationSteps](https://github.com/BCDevOps/StorageMigration/blob/master/MigrationSteps.md)
 
-Cross Cluster Migration: [CrossClusterDataSteps](https://github.com/BCDevOps/StorageMigration/CrossClusterDataSteps.md)
+Cross Cluster Migration: [CrossClusterDataSteps](https://github.com/BCDevOps/StorageMigration/blob/master/CrossClusterDataSteps.md)

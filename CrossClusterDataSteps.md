@@ -99,7 +99,7 @@ oc process -f ./cross-cluster/target-migrator-tmpl.yaml \
 
 4. Get token for remote secret value and create secret manifest for source (shortcut below)
 ``` bash
-MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
+MIG_TOKEN_SECRET=`oc get secret -o json | jq '.items[] | select(.type == "kubernetes.io/service-account-token") | .metadata.name' | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
 # Use token value to generate local temp secret
 oc create secret generic x-cluster-test --from-literal=token=`oc get secret ${MIG_TOKEN_SECRET} -o json | jq -r .data.token | base64 -d` --dry-run=client -o json > tmp.secret
 ```

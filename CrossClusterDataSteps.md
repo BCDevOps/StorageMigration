@@ -112,7 +112,7 @@ oc get is pvc-migrator
 3. Deploy template manifests to create deployment, service account and rolebinding.
 ``` bash
 oc process -f ./cross-cluster/target-migrator-tmpl.yaml \
-  --param-file=cross-cluster/tester.env \
+  --param-file=cross-cluster/dest.env \
   --ignore-unknown-parameters=true | oc apply -f - -n DESTINATION_CLUSTER
 ```
 
@@ -146,7 +146,7 @@ oc get is pvc-migrator
 7. Deploy templated manifests to create deployment
 ``` bash
 oc process -f ./cross-cluster/source-migrator-tmpl.yaml \
-  --param-file=cross-cluster/tester.env \
+  --param-file=cross-cluster/source.env \
   --ignore-unknown-parameters=true | oc apply -f - -n SOURCE_CLUSTER
 ```
 

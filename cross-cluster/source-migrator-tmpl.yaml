@@ -33,7 +33,7 @@ parameters:
   displayName: Image Namespace
   description: The namespace of the OpenShift project containing the imagestream for the application.
   required: true
-  value: bcgov
+  value: bztwou-dev
 - name: SRC_IMAGE_REGISTRY
   #ocp3#docker-registry.default.svc:5000
   value: docker-registry.default.svc:5000

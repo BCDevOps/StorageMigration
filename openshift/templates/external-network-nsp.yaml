@@ -1,0 +1,13 @@
+kind: NetworkSecurityPolicy
+apiVersion: security.devops.gov.bc.ca/v1alpha1
+metadata:
+  name: allow-all-pods-to-external-network
+  labels:
+    name: allow-all-pods-to-external-network
+    env: dev
+spec:
+  description: 'Allow the builds to access the internet. This only needs to be specified once per environment.'
+  source:
+    - - $namespace=a99fd4-dev
+  destination:
+    - - ext:network=any

@@ -60,15 +60,15 @@ if [ "$PARAM" = "clean" ]; then
   printStatusMsg "Switching to destination cluster"
   oc config use-context ${DST_CONTEXT}
 
-  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret -n ${DST_CLUSTER}
-  oc delete -l app=pvc-migrator build,buildconfig,is,nsp -n ${DST_CLUSTER}
+  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
+  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
 
   # make sure we're using the destination context
   printStatusMsg "Switching to source cluster"
   oc config use-context ${SRC_CONTEXT}
   
-  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret -n ${SRC_CLUSTER}
-  oc delete -l app=pvc-migrator build,buildconfig,is,nsp -n ${SRC_CLUSTER}
+  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
+  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
 else
   # make sure we're using the destination context
   printStatusMsg "Switching to destination cluster"
@@ -77,7 +77,7 @@ else
   #build NSP
   if [ ! -z ${DST_OCP4} ] && [ ${DST_OCP4}=true ]; then
     export NAMESPACE_NAME=${DST_CLUSTER}
-    oc apply -n ${DST_CLUSTER} -f ./templates/external-network-nsp.yaml
+    oc apply -f ./templates/external-network-nsp.yaml -n ${DST_CLUSTER}
   fi
 
   #build pvc-migrator
@@ -103,12 +103,12 @@ else
   printStatusMsg "Switching to source cluster"
   oc config use-context ${SRC_CONTEXT}
 
-  oc apply -f ./tmp.secret
-  oc label secret x-cluster-test base=xc-pvc-migrator
+  oc apply -n ${SRC_CLUSTER} -f ./tmp.secret; rm tmp.secret 
+  oc label secret x-cluster-test base=xc-pvc-migrator -n ${SRC_CLUSTER}
 
   if [ ! -z ${SRC_OCP4} ] && [ ${SRC_OCP4}=true ]; then
     export NAMESPACE_NAME=${SRC_CLUSTER}
-    oc apply -n ${SRC_CLUSTER} -f ./templates/external-network-nsp.yaml -n ${SRC_CLUSTER}
+    oc apply -n ${SRC_CLUSTER} -f ./templates/external-network-nsp.yaml
   fi
 
   oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${SRC_CLUSTER}
@@ -122,10 +122,10 @@ else
   printStatusMsg "Monitor the deployment in ${SRC_CLUSTER} console and press ENTER after it completes:"
   read
 
-  MIG_POD=$(oc get pods -n ${SRC_CLUSTER} | grep source-pvc-migrator | awk '{print $1}')
+  MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
   #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
-  oc exec -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
+  oc exec -n ${SRC_CLUSTER} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target" 
 
 fi
 

@@ -51,7 +51,7 @@ For this sample, the source/target clusters have been reversed to accomodate pen
 
 | **Source Cluster** | KLab |
 | ----- | ----- |
-| **namespace** | SOURCE_CLUSTER (eg:bztwou-dev) |
+| **namespace** | SOURCE_CLUSTER (eg:devex-von-prod) |
 | **pvc name** | x-cluster-klab-1 |
 | **token secret name** | x-cluster-test |
 | | |
@@ -59,7 +59,7 @@ For this sample, the source/target clusters have been reversed to accomodate pen
 | **Destination Cluster** | Pathfinder Lab |
 | ----- | ----- |
 | **API URL**| https://api.silver.devops.gov.bc.ca:6443 |
-| **namespace** | DESTINATION_CLUSTER (eg:a99fd4-dev) |
+| **namespace** | DESTINATION_CLUSTER (eg:4a9599-prod) |
 | **destination PVC name** | x-cluster-plab-1 |
 | **auth token** | \<Optional, or from service account secret\> |
 | | |
@@ -84,7 +84,7 @@ REMOTE_SECRET=x-cluster-test
 ```
 
 Next, if you are deploying to OCP4, modify the `./openshift/templates/external-network-nsp.yaml` file and
-change `$namespace=a99fd4-dev` to your `DESTINATION_CLUSTER`.  
+change `$namespace=4a9599-prod` to your `DESTINATION_CLUSTER`.  
   
 Finally, go to `./cross-cluster/source-migrator-tmpl.yaml` and replace the `SRC_IMAGE_NAMESPACE` value with
 your `SOURCE_CLUSTER`  
@@ -93,7 +93,7 @@ your `SOURCE_CLUSTER`
   displayName: Image Namespace
   description: The namespace of the OpenShift project containing the imagestream for the application.
   required: true
-  value: bztwou-dev
+  value: devex-von-prod
 ```
 
 2. Login to Destination Cluster (pathfinder lab, namespace DESTINATION_CLUSTER)
@@ -101,7 +101,7 @@ your `SOURCE_CLUSTER`
   **If your destination cluster is in OCP4, you first need to create an nsp for the build**
   ``` bash
   # only needed if your destination cluster is in OCP4 
-  oc apply -n a99fd4-dev -f ./openshift/templates/external-network-nsp.yaml
+  oc apply -n 4a9599-prod -f ./openshift/templates/external-network-nsp.yaml
   ```
 ``` bash
 oc process -f ./openshift/templates/pvc-migrator-build.yaml | oc apply -f - -n DESTINATION_CLUSTER
@@ -129,7 +129,7 @@ Note: to login to multiple clusters at the same time use
 ``` bash
 oc config use-context CLUSTER_NAME/CLUSTER_ENDPOINT/USERNAME
 # example:
-oc config use-context bztwou-dev/console-pathfinder-gov-bc-ca:8443/wadeking98
+oc config use-context devex-von-prod/console-pathfinder-gov-bc-ca:8443/wadeking98
 ```
 ``` bash
 oc apply -n SOURCE_CLUSTER -f ./tmp.secret; rm ./tmp.secret

@@ -1,13 +1,30 @@
-kind: NetworkSecurityPolicy
-apiVersion: security.devops.gov.bc.ca/v1alpha1
+apiVersion: template.openshift.io/v1
+kind: Template
 metadata:
-  name: allow-all-pods-to-external-network
-  labels:
-    name: allow-all-pods-to-external-network
-    env: dev
-spec:
-  description: 'Allow the builds to access the internet. This only needs to be specified once per environment.'
-  source:
-    - - $namespace=a99fd4-dev
-  destination:
-    - - ext:network=any
+  name: "migrate-base-template"
+  annotations:
+    description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
+    tags: storage,migration
+objects:
+  - kind: NetworkSecurityPolicy
+    apiVersion: security.devops.gov.bc.ca/v1alpha1
+    metadata:
+      name: allow-all-pods-to-external-network
+      labels:
+        name: allow-all-pods-to-external-network
+        app: ${NAME}
+    spec:
+      description: 'Allow the builds to access the internet. This only needs to be specified once per environment.'
+      source:
+        - - $namespace=${NAMESPACE_NAME}
+      destination:
+        - - ext:network=any
+parameters:
+  - name: NAME
+    description: "Name of the deployment config."
+    value: "pvc-migrator"
+  - name: NAMESPACE_NAME
+    displayName: Namespace Name
+    description: The name of the namespace being deployed to..
+    required: true
+    value: a99fd4-prod

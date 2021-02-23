@@ -1,0 +1,131 @@
+#!/bin/bash
+_includeFile="ocFunctions.inc"
+_settingsFile="settings.sh"
+_overrides="overrides.inc"
+
+# specify that we're expecting cl args
+onUsesCommandLineArguments(){
+  return 0;
+}
+
+if [ ! -z $(type -p ${_includeFile}) ]; then
+  _includeFilePath=$(type -p ${_includeFile})
+  export OCTOOLSBIN=$(dirname ${_includeFilePath})
+
+  if [ -f ${OCTOOLSBIN}/${_settingsFile} ]; then
+    . ${OCTOOLSBIN}/${_settingsFile}
+  fi
+
+  if [ -f ${OCTOOLSBIN}/${_includeFile} ]; then
+    . ${OCTOOLSBIN}/${_includeFile}
+  fi
+
+  if [ -f ${OCTOOLSBIN}/${_overrides} ]; then
+    . ${OCTOOLSBIN}/${_overrides}
+  fi
+else
+  _red='\033[0;31m'
+  _yellow='\033[1;33m'
+  _nc='\033[0m' # No Color
+  echo -e \\n"${_red}${_includeFile} could not be found on the path.${_nc}"
+  echo -e "${_yellow}Please ensure the openshift-developer-tools are installed on and registered on your path.${_nc}"
+  echo -e "${_yellow}https://github.com/BCDevOps/openshift-developer-tools${_nc}"
+fi
+
+
+
+
+if [ -z $DST_CONTEXT ] || [ -z $SRC_CONTEXT ]; then
+  # operations on destination cluster
+  oc config get-contexts | sed 's/*/ /g' | awk '{print $1}' | sed '1 d'
+  printStatusMsg "Please enter your destination cluster from the list above:"
+  read DST_CONTEXT
+
+  printStatusMsg "Please enter your source cluster from the list above:"
+  read SRC_CONTEXT
+fi
+
+export DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+export SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+export REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
+export REMOTE_PROJECT=$DST_CLUSTER
+
+# check if user wants to clean everything
+PARAM=${1}
+echo $PARAM
+if [ "$PARAM" = "clean" ]; then
+  printStatusMsg "Cleaning secrets, deployments, builds, etc"
+
+  # make sure we're using the destination context
+  printStatusMsg "Switching to destination cluster"
+  oc config use-context ${DST_CONTEXT}
+
+  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret -n ${DST_CLUSTER}
+  oc delete -l app=pvc-migrator build,buildconfig,is,nsp -n ${DST_CLUSTER}
+
+  # make sure we're using the destination context
+  printStatusMsg "Switching to source cluster"
+  oc config use-context ${SRC_CONTEXT}
+  
+  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret -n ${SRC_CLUSTER}
+  oc delete -l app=pvc-migrator build,buildconfig,is,nsp -n ${SRC_CLUSTER}
+else
+  # make sure we're using the destination context
+  printStatusMsg "Switching to destination cluster"
+  oc config use-context ${DST_CONTEXT}
+
+  #build NSP
+  if [ ! -z ${DST_OCP4} ] && [ ${DST_OCP4}=true ]; then
+    export NAMESPACE_NAME=${DST_CLUSTER}
+    oc apply -n ${DST_CLUSTER} -f ./templates/external-network-nsp.yaml
+  fi
+
+  #build pvc-migrator
+  oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${DST_CLUSTER}
+
+  printStatusMsg "Monitor the build in ${DST_CLUSTER} console and press ENTER after it completes:"
+  read
+
+  oc process -f ../cross-cluster/target-migrator-tmpl.yaml \
+  --param-file=../cross-cluster/dest.env \
+  --ignore-unknown-parameters=true | oc apply -f - -n ${DST_CLUSTER}
+
+  MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
+
+  # get the name of the migration pod target
+  MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
+
+  # Use token value to generate local temp secret
+  oc create secret generic x-cluster-test --from-literal=token=`oc get secret ${MIG_TOKEN_SECRET} -o json | jq -r .data.token | base64 -d` --dry-run -o json > tmp.secret
+
+  #swtich to source cluster -------------------
+
+  printStatusMsg "Switching to source cluster"
+  oc config use-context ${SRC_CONTEXT}
+
+  oc apply -f ./tmp.secret
+  oc label secret x-cluster-test base=xc-pvc-migrator
+
+  if [ ! -z ${SRC_OCP4} ] && [ ${SRC_OCP4}=true ]; then
+    export NAMESPACE_NAME=${SRC_CLUSTER}
+    oc apply -n ${SRC_CLUSTER} -f ./templates/external-network-nsp.yaml -n ${SRC_CLUSTER}
+  fi
+
+  oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${SRC_CLUSTER}
+  printStatusMsg "Monitor the build in ${SRC_CLUSTER} console and press ENTER after it completes:"
+  read
+
+  oc process -f ../cross-cluster/source-migrator-tmpl.yaml \
+  --param-file=../cross-cluster/source.env \
+  --ignore-unknown-parameters=true | oc apply -f - -n ${SRC_CLUSTER}
+
+  printStatusMsg "Monitor the deployment in ${SRC_CLUSTER} console and press ENTER after it completes:"
+  read
+
+  MIG_POD=$(oc get pods -n ${SRC_CLUSTER} | grep source-pvc-migrator | awk '{print $1}')
+
+  #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
+  oc exec -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
+
+fi
+

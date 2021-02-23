@@ -1,26 +1,11 @@
 ---
 apiVersion: template.openshift.io/v1
 kind: Template
-parameters:
-- name: NAME
-  displayName: Name
-  description: The name assigned to all of the resources defined in this template.
-  required: true
-  value: pvc-migrator
-- name: GIT_REPO_URL
-  displayName: Git Repository URL
-  description: The URL of the repository containing the code.
-  required: true
-  value: https://github.com/BCDevOps/StorageMigration.git
-- name: GIT_REF
-  displayName: Git Reference
-  description: Set this to a branch name, tag or other ref of your repository if you are not using the default branch.
-  required: false
-  value: master
-- name: SOURCE_CONTEXT_DIR
-  displayName: Source Context Directory
-  description: The folder in the Git repo that contains the source code.
-  value: docker
+metadata:
+  name: "migrate-base-template-build"
+  annotations:
+    description: "Template to build pvc-migrator"
+    tags: storage,migration
 objects:
 - kind: ImageStream
   apiVersion: v1
@@ -44,7 +29,7 @@ objects:
       type: Git
       git:
         ref: "${GIT_REF}"
-        uri: "${GIT_REPO_URL}"
+        uri: "${GIT_URI}"
       contextDir: "${SOURCE_CONTEXT_DIR}"
     strategy:
       dockerStrategy:
@@ -53,3 +38,23 @@ objects:
       to:
         kind: ImageStreamTag
         name: "${NAME}:latest"
+parameters:
+- name: NAME
+  displayName: Name
+  description: The name assigned to all of the resources defined in this template.
+  required: true
+  value: pvc-migrator
+- name: GIT_URI
+  displayName: Git Repository URL
+  description: The URL of the repository containing the code.
+  required: true
+  value: https://github.com/BCDevOps/StorageMigration.git
+- name: GIT_REF
+  displayName: Git Reference
+  description: Set this to a branch name, tag or other ref of your repository if you are not using the default branch.
+  required: false
+  value: master
+- name: SOURCE_CONTEXT_DIR
+  displayName: Source Context Directory
+  description: The folder in the Git repo that contains the source code.
+  value: docker

@@ -5,31 +5,6 @@ metadata:
   annotations:
     description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
     tags: storage,migration
-parameters:
-- name: NAME
-  description: "Name of the deployment."
-  value: "target-pvc-migrator"
-- name: DESTINATION_PVC
-  description: "Name of an existing PVC to use as the content destination."
-  required: true
-- name: DST_IMAGE_NAME
-  displayName: Container Image Name
-  description: The name of the image to use for this resource.
-  required: true
-  value: pvc-migrator
-- name: DST_IMAGE_NAMESPACE
-  displayName: Image Namespace
-  description: The namespace of the OpenShift project containing the imagestream for the application.
-  required: true
-  value: bcgov
-- name: DST_IMAGE_REGISTRY
-  #ocp3#docker-registry.default.svc:5000
-  value: image-registry.openshift-image-registry.svc:5000
-- name: TAG_NAME
-  displayName: Environment TAG name
-  description: The TAG name for this environment, e.g., dev, test, prod
-  required: true
-  value: dev
 objects:
 - apiVersion: apps/v1
   kind: Deployment
@@ -85,4 +60,30 @@ objects:
   subjects:
   - kind: ServiceAccount
     name: ${NAME}
+parameters:
+- name: NAME
+  description: "Name of the deployment."
+  value: "target-pvc-migrator"
+- name: DESTINATION_PVC
+  description: "Name of an existing PVC to use as the content destination."
+  required: true
+  value: backup-mariadb
+- name: DST_IMAGE_NAME
+  displayName: Container Image Name
+  description: The name of the image to use for this resource.
+  required: true
+  value: pvc-migrator
+- name: DST_IMAGE_NAMESPACE
+  displayName: Image Namespace
+  description: The namespace of the OpenShift project containing the imagestream for the application.
+  required: true
+  value: 4a9599-prod
+- name: DST_IMAGE_REGISTRY
+  #ocp3#docker-registry.default.svc:5000
+  value: image-registry.openshift-image-registry.svc:5000
+- name: TAG_NAME
+  displayName: Environment TAG name
+  description: The TAG name for this environment, e.g., dev, test, prod
+  required: true
+  value: dev
 

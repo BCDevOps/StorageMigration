@@ -45,10 +45,12 @@ if [ -z $DST_CONTEXT ] || [ -z $SRC_CONTEXT ]; then
   read SRC_CONTEXT
 fi
 
+# set environment variables
 export DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
 export SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
 export REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
 export REMOTE_PROJECT=$DST_CLUSTER
+export DST_IMAGE_NAMESPACE=$DST_CLUSTER
 
 # check if user wants to clean everything
 PARAM=${1}
@@ -86,9 +88,10 @@ else
   printStatusMsg "Monitor the build in ${DST_CLUSTER} console and press ENTER after it completes:"
   read
 
-  oc process -f ../cross-cluster/target-migrator-tmpl.yaml \
-  --param-file=../cross-cluster/dest.env \
-  --ignore-unknown-parameters=true | oc apply -f - -n ${DST_CLUSTER}
+  oc process -f ../cross-cluster/target-migrator-tmpl.yaml | oc apply -f - -n ${DST_CLUSTER}
+  # oc process -f ../cross-cluster/target-migrator-tmpl.yaml \
+  # --param-file=../cross-cluster/dest.env \
+  # --ignore-unknown-parameters=true | oc apply -f - -n ${DST_CLUSTER}
 
   MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
 
@@ -111,13 +114,15 @@ else
     oc apply -n ${SRC_CLUSTER} -f ./templates/external-network-nsp.yaml
   fi
 
+  # oc apply -f ./templates/pvc-migrator-build.yaml -n ${SRC_CLUSTER}
   oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${SRC_CLUSTER}
   printStatusMsg "Monitor the build in ${SRC_CLUSTER} console and press ENTER after it completes:"
   read
 
-  oc process -f ../cross-cluster/source-migrator-tmpl.yaml \
-  --param-file=../cross-cluster/source.env \
-  --ignore-unknown-parameters=true | oc apply -f - -n ${SRC_CLUSTER}
+  oc process -f ../cross-cluster/source-migrator-tmpl.yaml | oc apply -f - -n ${SRC_CLUSTER}
+  # oc process -f ../cross-cluster/source-migrator-tmpl.yaml \
+  # --param-file=../cross-cluster/source.env \
+  # --ignore-unknown-parameters=true | oc apply -f - -n ${SRC_CLUSTER}
 
   printStatusMsg "Monitor the deployment in ${SRC_CLUSTER} console and press ENTER after it completes:"
   read

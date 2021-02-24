@@ -45,12 +45,7 @@ if [ -z $DST_CONTEXT ] || [ -z $SRC_CONTEXT ]; then
   read SRC_CONTEXT
 fi
 
-# set environment variables
-export DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
-export SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
-export REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
-export REMOTE_PROJECT=$DST_CLUSTER
-export DST_IMAGE_NAMESPACE=$DST_CLUSTER
+
 
 # check if user wants to clean everything
 PARAM=${1}

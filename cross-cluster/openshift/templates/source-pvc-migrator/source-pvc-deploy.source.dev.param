@@ -1,0 +1,14 @@
+#=========================================================
+# OpenShift template parameters for:
+# Component: .
+# Template File: ../openshift/templates/source-pvc-migrator/source-pvc-deploy.yaml
+#=========================================================
+# NAME=source-pvc
+# SOURCE_PVC=backup
+# REMOTE_CLUSTER=https://api.silver.devops.gov.bc.ca:6443
+# REMOTE_PROJECT=4a9599-prod
+# REMOTE_SECRET=x-cluster-test
+# SRC_IMAGE_NAME=pvc-migrator
+# SRC_IMAGE_NAMESPACE=devex-von-prod
+# SRC_IMAGE_REGISTRY=docker-registry.default.svc:5000
+TAG_NAME=dev

@@ -1,0 +1,9 @@
+#=========================================================
+# OpenShift template parameters for:
+# Component: .
+# Template File: ../openshift/templates/pvc-migrator-build.yaml
+#=========================================================
+NAME=pvc-migrator
+GIT_URI=https://github.com/BCDevOps/StorageMigration.git
+GIT_REF=master
+SOURCE_CONTEXT_DIR=docker

@@ -250,9 +250,14 @@ targetDeploy(){
 
 sourceDeploy(){
   CONTEXT=${1}
-  CLUSTER=${2}
-  IS_OCP4=${3}
+  CONTEXT_DST=${2}
+  CLUSTER=${3}
+  IS_OCP4=${4}
   #swtich to source cluster -------------------
+  printStatusMsg "Switching to destiantion cluster"
+  oc config use-context ${CONTEXT_DST}
+
+  MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
 
   printStatusMsg "Switching to source cluster"
   oc config use-context ${CONTEXT}
@@ -273,14 +278,14 @@ sourceDeploy(){
   MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
   #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
-  oc exec -n ${CLUSTER} -it "${MIG_POD}" -- bash -c "MIG_POD_TARGET=\`oc get pods | grep target-pvc-migrator | awk '{print \$1}')\`; cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . \${MIG_POD_TARGET}:/target"
+  oc exec -n ${CLUSTER} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
 }
 
 migrate(){
   if [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "target" ]; then
     targetDeploy ${DST_CONTEXT} ${DST_CLUSTER} ${DST_OCP4}
   elif [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "source" ]; then
-    sourceDeploy ${SRC_CONTEXT} ${SRC_CLUSTER} ${SRC_OCP4}
+    sourceDeploy ${SRC_CONTEXT} ${DST_CONTEXT} ${SRC_CLUSTER} ${SRC_OCP4}
   else
     printStatusMsg "Please either specifiy target or source profile"
     exit

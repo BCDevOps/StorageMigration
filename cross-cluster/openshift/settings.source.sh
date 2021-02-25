@@ -1,5 +1,5 @@
 export PROJECT_NAMESPACE=${PROJECT_NAMESPACE:-"devex-von"}
-export include_templates="source-pvc-deploy"
+export include_templates="source-pvc-migrator-deploy"
 
 export REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
 export REMOTE_PROJECT=$DST_CLUSTER

@@ -1,9 +1,9 @@
 #=========================================================
 # OpenShift template parameters for:
 # Component: .
-# Template File: ../openshift/templates/source-pvc-migrator/source-pvc-deploy.yaml
+# Template File: ../openshift/templates/source-pvc-migrator/source-pvc-migrator-deploy.yaml
 #=========================================================
-NAME=source-pvc
+NAME=source-pvc-migrator
 SOURCE_PVC=backup
 REMOTE_CLUSTER=https://api.silver.devops.gov.bc.ca:6443
 REMOTE_PROJECT=4a9599-prod

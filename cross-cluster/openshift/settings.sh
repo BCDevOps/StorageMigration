@@ -6,9 +6,3 @@ export DST_CONTEXT=4a9599-prod/api-silver-devops-gov-bc-ca:6443/wadeking98@githu
 export SRC_CONTEXT=devex-von-prod/console-pathfinder-gov-bc-ca:8443/wadeking98
 export DST_PVC=backup-mariadb # name of the source and destination pvcs
 export SRC_PVC=backup
-
-export DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
-export SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
-export REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
-export REMOTE_PROJECT=$DST_CLUSTER
-export DST_IMAGE_NAMESPACE=$DST_CLUSTER

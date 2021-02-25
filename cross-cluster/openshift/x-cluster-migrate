@@ -1,12 +1,60 @@
 #!/bin/bash
+
+export APPLY_LOCAL_SETTINGS=1
+
+# =================================================================================================================
+# Process the local command line arguments and pass everything else along.
+# - The 'getopts' options string must start with ':' for this to work.
+# -----------------------------------------------------------------------------------------------------------------
+while [ ${OPTIND} -le $# ]; do
+  if getopts :n:r:b: FLAG; then
+    case ${FLAG} in
+      # List of local options:
+      n) PROJECT_NAMESPACE=$OPTARG ;;
+      r) GIT_URI=$OPTARG ;;
+      b) GIT_REF=$OPTARG ;;
+
+      # Pass unrecognized options ...
+      \?) pass+=" -${OPTARG}" ;;
+    esac
+  else
+    # Pass unrecognized arguments ...
+    pass+=" ${!OPTIND}"
+    let OPTIND++
+  fi
+done
+
+# Pass the unrecognized arguments along for further processing ...
+shift $((OPTIND-1))
+set -- "$@" $(echo -e "${pass}" | sed -e 's/^[[:space:]]*//')
+# =================================================================================================================
+
+# -----------------------------------------------------------------------------------------------------------------
+# Define hook scripts:
+# - These must be defined before the main settings script 'settings.sh' is loaded.
+# -----------------------------------------------------------------------------------------------------------------
+onUsesCommandLineArguments() {
+  (
+    # This script is expecting command line arguments to be passed ...
+    return 0
+  )
+}
+
+# -----------------------------------------------------------------------------------------------------------------
+# Initialization:
+# -----------------------------------------------------------------------------------------------------------------
+
+# An empty settings.local.sh is required for the scripts to run correctly during the first run.
+# If no settings.local.sh is provided, the initialization above will fail due to 
+# the environment variable APPLY_LOCAL_SETTING set to 1.
+# Similarly, if the environment variable is not set, the initialize script will NOT
+# correctly create the local settings file
+touch settings.local.sh
+
 _includeFile="ocFunctions.inc"
 _settingsFile="settings.sh"
 _overrides="overrides.inc"
 
-# specify that we're expecting cl args
-onUsesCommandLineArguments(){
-  return 0;
-}
 
 if [ ! -z $(type -p ${_includeFile}) ]; then
   _includeFilePath=$(type -p ${_includeFile})
@@ -33,99 +81,272 @@ else
 fi
 
 
+usage () {
+  cat <<-EOF
+
+  A script to automate and manage the migration of files from one PVC to another across OCP clusters.
+
+  Steps:
+    - Initialize the PVC migrator environment using the 'init' command.
+    - Deploy the build configuration using the 'build' command.
+    - Migrate your PVC(s) using the 'migrate' command.
+    - Remove the PVC migrator components from your environment(s) using the 'clean' command.
+
+  Usage:
+    $0 [options] [commands]
+
+  Examples:
+    $0 -n devex-von-image init
+    $0 -n devex-von-image -r https://github.com/WadeBarnes/StorageMigration.git init
+
+    $0 -e tools migrate jenkins jenkins-data gluster-block 5Gi
+
+  Options:
+  ========
+    -n Project namespace, the name of the target project minus the environment suffix (-tool, -dev, -test, -prod).
+       Used by the 'init' command to set the target project for all subsequent operations.
+
+    -r Optional - GitHub repository URL
+       Used by the 'init' command to set the GitHub for repository for all subsequent build operations.
+       Only used for build operations to redirect the source repository to another fork.
+
+    -b Optional - Git Branch
+       Used by the 'init' command to set the branch of the repository for all subsequent build operations.
+       Only used for build operations to redirect the source repository to another branch of a fork.
+
+  Commands:
+  ========
+    init
+      - Initialize the PVC migrator environment for your project environment.
+        Specify your project namespace using the -n option.
+
+    build
+      - Deploy the PVC migrator build configuration.
+
+    migrate <hostPodName> <pvcName> <pvcType> <pvcSize>
+      - Migrate files from one PVC to another of the same name.
+        Good for migrating from one storage class to another, or to a new PVC of a different size.
+
+      - Required parameters:
+        - hostPodName: The friendly name of the host pod.  Typically, this is the same as the deployment configuration name.
+        - pvcName: The name of the PVC to be migrated.
+        - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, or gluster-file-db.
+        - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
+
+EOF
+}
 
 
-if [ -z $DST_CONTEXT ] || [ -z $SRC_CONTEXT ]; then
-  # operations on destination cluster
+projectNamespaceSet() {
+  if [ ! -z "${PROJECT_NAMESPACE}" ] && [ "bcgov" != "${PROJECT_NAMESPACE}" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+requireProjectNamespace(){
+  _red='\033[0;31m'
+  _nc='\033[0m' # No Color
+
+  # Deployment Environment Name
+  if ! projectNamespaceSet; then
+    echo
+    echo -e "${_red}You MUST specify a project namespace using the '-n' flag.${_nc}"
+    globalUsage
+    exit 1
+  fi
+}
+
+requireDevelopmentEnvName(){
+  _red='\033[0;31m'
+  _nc='\033[0m' # No Color
+
+  # Deployment Environment Name
+  if ! deploymentEnvNameSet; then
+    echo
+    echo -e "${_red}You MUST specify an environment name using the '-e' flag.${_nc}"
+    echo -e "${_red}Assuming a default would have unwanted consequences.${_nc}"
+    globalUsage
+    exit 1
+  fi
+}
+
+initialize(){
+  echo -e "\nInitializing environment settings ...\n"
+
+  # Write a local settings file ...
+  echo "Writing local settings file (settings.local.sh) ..."
+  echo "export GIT_URI=${GIT_URI}" > settings.local.sh
+  echo "export GIT_REF=${GIT_REF}" >> settings.local.sh
+
   oc config get-contexts | sed 's/*/ /g' | awk '{print $1}' | sed '1 d'
   printStatusMsg "Please enter your destination cluster from the list above:"
   read DST_CONTEXT
+  echo "export DST_CONTEXT=${DST_CONTEXT}" >> settings.local.sh
+
+  printStatusMsg "Is your destination cluster on OpenShift Platform 4? (yes/no):"
+  read DST_OCP4_RESP
+  if [ "${DST_OCP4_RESP}" = "yes" ]; then 
+    DST_OCP4=true 
+  else 
+    DST_OCP4=false 
+  fi
+  echo "export DST_OCP4=${DST_OCP4}" >> settings.local.sh
 
   printStatusMsg "Please enter your source cluster from the list above:"
   read SRC_CONTEXT
-fi
+  echo "export SRC_CONTEXT=${SRC_CONTEXT}" >> settings.local.sh
+
+  printStatusMsg "Is your source cluster on OpenShift Platform 4? (yes/no):"
+  read SRC_OCP4_RESP
+  if [ "${SRC_OCP4_RESP}" = "yes" ]; then 
+    SRC_OCP4=true 
+  else 
+    SRC_OCP4=false 
+  fi
+  echo "export SRC_OCP4=${SRC_OCP4}" >> settings.local.sh
+
+  printStatusMsg "Please enter your source PVC"
+  read SRC_PVC
+  echo "export SRC_PVC=${SRC_PVC}" >> settings.local.sh
+
+  printStatusMsg "Please enter your destination PVC"
+  read DST_PVC
+  echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
+
+  # Generate local params files ...
+  echo "Generating local param files ..."
+  genTemplateParams.sh -lf
+
+}
 
 
-
-# check if user wants to clean everything
-PARAM=${1}
-echo $PARAM
-if [ "$PARAM" = "clean" ]; then
-  printStatusMsg "Cleaning secrets, deployments, builds, etc"
-
+targetDeploy(){
+  CONTEXT=${1}
+  CLUSTER=${2}
+  IS_OCP4=${3}
   # make sure we're using the destination context
+  printStatusMsg "${CONTEXT} ${CLUSTER} ${IS_OCP4}"
   printStatusMsg "Switching to destination cluster"
-  oc config use-context ${DST_CONTEXT}
-
-  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
-  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
-
-  # make sure we're using the destination context
-  printStatusMsg "Switching to source cluster"
-  oc config use-context ${SRC_CONTEXT}
-  
-  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
-  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
-else
-  # make sure we're using the destination context
-  printStatusMsg "Switching to destination cluster"
-  oc config use-context ${DST_CONTEXT}
+  oc config use-context ${CONTEXT}
 
   #build NSP
-  if [ ! -z ${DST_OCP4} ] && [ ${DST_OCP4}=true ]; then
-    export NAMESPACE_NAME=${DST_CLUSTER}
-    oc apply -f ./templates/external-network-nsp.yaml -n ${DST_CLUSTER}
+  if [ ! -z ${IS_OCP4} ] && [ ${IS_OCP4}=true ]; then
+    export NAMESPACE_NAME=${CLUSTER}
+    oc apply -f ./templates/external-network-nsp.yaml -n ${CLUSTER}
   fi
+  
+  genDepls.sh -p "target" -n "${CONTEXT}"
 
-  #build pvc-migrator
-  oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${DST_CLUSTER}
-
-  printStatusMsg "Monitor the build in ${DST_CLUSTER} console and press ENTER after it completes:"
+  printStatusMsg "Monitor the deployment in ${CLUSTER} console and press ENTER after it completes:"
   read
-
-  oc process -f ../cross-cluster/target-migrator-tmpl.yaml | oc apply -f - -n ${DST_CLUSTER}
-  # oc process -f ../cross-cluster/target-migrator-tmpl.yaml \
-  # --param-file=../cross-cluster/dest.env \
-  # --ignore-unknown-parameters=true | oc apply -f - -n ${DST_CLUSTER}
 
   MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
 
-  # get the name of the migration pod target
-  MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
-
   # Use token value to generate local temp secret
   oc create secret generic x-cluster-test --from-literal=token=`oc get secret ${MIG_TOKEN_SECRET} -o json | jq -r .data.token | base64 -d` --dry-run -o json > tmp.secret
+}
 
+sourceDeploy(){
+  CONTEXT=${1}
+  CLUSTER=${2}
+  IS_OCP4=${3}
   #swtich to source cluster -------------------
 
   printStatusMsg "Switching to source cluster"
-  oc config use-context ${SRC_CONTEXT}
+  oc config use-context ${CONTEXT}
 
-  oc apply -n ${SRC_CLUSTER} -f ./tmp.secret; rm tmp.secret 
-  oc label secret x-cluster-test base=xc-pvc-migrator -n ${SRC_CLUSTER}
+  oc apply -n ${CLUSTER} -f ./tmp.secret; rm tmp.secret 
+  oc label secret x-cluster-test base=xc-pvc-migrator -n ${SRC_CLCLUSTERUSTER}
 
-  if [ ! -z ${SRC_OCP4} ] && [ ${SRC_OCP4}=true ]; then
-    export NAMESPACE_NAME=${SRC_CLUSTER}
-    oc apply -n ${SRC_CLUSTER} -f ./templates/external-network-nsp.yaml
+  if [ ! -z ${IS_OCP4} ] && [ ${IS_OCP4}=true ]; then
+    export NAMESPACE_NAME=${CLUSTER}
+    oc apply -n ${CLUSTER} -f ./templates/external-network-nsp.yaml
   fi
 
-  # oc apply -f ./templates/pvc-migrator-build.yaml -n ${SRC_CLUSTER}
-  oc process -f ./templates/pvc-migrator-build.yaml | oc apply -f - -n ${SRC_CLUSTER}
-  printStatusMsg "Monitor the build in ${SRC_CLUSTER} console and press ENTER after it completes:"
-  read
+  updateDeploymentParams prod
+  #unset SETTINGS_LOADED
+  genDepls.sh -p "source" -n "${CLUSTER}"
 
-  oc process -f ../cross-cluster/source-migrator-tmpl.yaml | oc apply -f - -n ${SRC_CLUSTER}
-  # oc process -f ../cross-cluster/source-migrator-tmpl.yaml \
-  # --param-file=../cross-cluster/source.env \
-  # --ignore-unknown-parameters=true | oc apply -f - -n ${SRC_CLUSTER}
-
-  printStatusMsg "Monitor the deployment in ${SRC_CLUSTER} console and press ENTER after it completes:"
+  printStatusMsg "Monitor the deployment in ${CLUSTER} console and press ENTER after it completes:"
   read
 
   MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
   #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
-  oc exec -n ${SRC_CLUSTER} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target" 
+  oc exec -n ${CLUSTER} -it "${MIG_POD}" -- bash -c "MIG_POD_TARGET=\`oc get pods | grep target-pvc-migrator | awk '{print \$1}')\`; cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . \${MIG_POD_TARGET}:/target"
+}
 
-fi
+migrate(){
+  if [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "target" ]; then
+    targetDeploy ${DST_CONTEXT} ${DST_CLUSTER} ${DST_OCP4}
+  elif [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "source" ]; then
+    sourceDeploy ${SRC_CONTEXT} ${SRC_CLUSTER} ${SRC_OCP4}
+  else
+    printStatusMsg "Please either specifiy target or source profile"
+    exit
+  fi
+}
+
+cleanEnv(){
+  if [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "target" ]; then
+    CONTEXT=${DST_CONTEXT}
+  elif [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "source" ]; then
+    CONTEXT=${SRC_CONTEXT}
+  else
+    printStatusMsg "Please either specifiy target or source profile"
+    exit
+  fi
+
+  printStatusMsg "Cleaning secrets, deployments, builds, etc"
+
+  # make sure we're using the destination context
+  printStatusMsg "Switching to destination cluster"
+  oc config use-context ${CONTEXT}
+
+  oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
+  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
+}
+
+
+# pushd ${SCRIPT_HOME} >/dev/null
+_cmd=$(toLower ${1})
+shift
+
+case "${_cmd}" in
+  init)
+    # requireProjectNamespace
+    initialize
+    ;;
+  migrate)
+    # requireDevelopmentEnvName
+    migrate
+    ;;
+  clean)
+    # requireDevelopmentEnvName
+    cleanEnv
+    ;;
+
+  *)
+    echoWarning "Unrecognized command; ${_cmd}"
+    globalUsage
+    ;;
+esac
+
+# popd >/dev/null
+
+# if [ ! -z "${PARAM}" ] && [ "${PARAM}" = "clean" ]; then
+#   if [ ! -z ${PROFILE} ] && [ "${PROFILE}"="target" ]; then
+#     CONTEXT=${DST_CONTEXT}
+#   elif [ ! -z ${PROFILE} ] && [ "${PROFILE}"="source" ]; then
+#     CONTEXT=${SRC_CONTEXT}
+#   else
+#     printStatusMsg "Please either specifiy target or source profile"
+#     exit
+#   fi
+#   cleanEnv ${CONTEXT} 
+# else
+  
+# fi
 

@@ -257,16 +257,14 @@ sourceDeploy(){
   printStatusMsg "Switching to source cluster"
   oc config use-context ${CONTEXT}
 
-  oc apply -n ${CLUSTER} -f ./tmp.secret; rm tmp.secret 
-  oc label secret x-cluster-test base=xc-pvc-migrator -n ${SRC_CLCLUSTERUSTER}
+  oc apply -n ${CLUSTER} -f ./tmp.secret
+  oc label secret x-cluster-test base=xc-pvc-migrator -n ${CLUSTER}
 
   if [ ! -z ${IS_OCP4} ] && [ ${IS_OCP4}=true ]; then
     export NAMESPACE_NAME=${CLUSTER}
     oc apply -n ${CLUSTER} -f ./templates/external-network-nsp.yaml
   fi
 
-  updateDeploymentParams prod
-  #unset SETTINGS_LOADED
   genDepls.sh -p "source" -n "${CLUSTER}"
 
   printStatusMsg "Monitor the deployment in ${CLUSTER} console and press ENTER after it completes:"

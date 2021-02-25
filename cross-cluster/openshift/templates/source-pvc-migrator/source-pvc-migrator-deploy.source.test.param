@@ -11,4 +11,3 @@
 # SRC_IMAGE_NAME=pvc-migrator
 # SRC_IMAGE_NAMESPACE=devex-von-prod
 # SRC_IMAGE_REGISTRY=docker-registry.default.svc:5000
-TAG_NAME=test

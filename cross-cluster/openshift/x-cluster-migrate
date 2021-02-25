@@ -51,6 +51,8 @@ onUsesCommandLineArguments() {
 # correctly create the local settings file
 touch settings.local.sh
 
+
+
 _includeFile="ocFunctions.inc"
 _settingsFile="settings.sh"
 _overrides="overrides.inc"
@@ -136,6 +138,14 @@ usage () {
 EOF
 }
 
+deploymentEnvNameSet() {
+  echo "${DEPLOYMENT_ENV_NAME}"
+  if [ ! -z "${DEPLOYMENT_ENV_NAME}" ]; then
+    return 0
+  else
+    return 1
+  fi
+}
 
 projectNamespaceSet() {
   if [ ! -z "${PROJECT_NAMESPACE}" ] && [ "bcgov" != "${PROJECT_NAMESPACE}" ]; then
@@ -215,9 +225,13 @@ initialize(){
   read DST_PVC
   echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
 
-  # Generate local params files ...
-  echo "Generating local param files ..."
-  genTemplateParams.sh -lf
+  echo "
+export REMOTE_CLUSTER=\$(echo \${DST_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$2 }' )
+export REMOTE_PROJECT=\$DST_CLUSTER
+export DST_CLUSTER=\$(echo \${DST_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$1 }' )
+export SRC_CLUSTER=\$(echo \${SRC_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$1 }' )
+export DEPLOYMENT_ENV_NAME=\$(echo \${SRC_CLUSTER} | sed 's/.*-//g')
+  " >> settings.local.sh
 
 }
 
@@ -323,11 +337,11 @@ case "${_cmd}" in
     initialize
     ;;
   migrate)
-    # requireDevelopmentEnvName
+    requireDevelopmentEnvName
     migrate
     ;;
   clean)
-    # requireDevelopmentEnvName
+    requireDevelopmentEnvName
     cleanEnv
     ;;
 

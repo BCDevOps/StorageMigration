@@ -8,4 +8,3 @@
 # DST_IMAGE_NAME=pvc-migrator
 # DST_IMAGE_NAMESPACE=4a9599-prod
 # DST_IMAGE_REGISTRY=image-registry.openshift-image-registry.svc:5000
-TAG_NAME=prod

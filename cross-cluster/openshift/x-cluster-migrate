@@ -1,5 +1,5 @@
 #!/bin/bash
-
+SCRIPT_HOME="$( cd "$( dirname "$0" )" && pwd )"
 export APPLY_LOCAL_SETTINGS=1
 
 # =================================================================================================================
@@ -89,8 +89,8 @@ usage () {
   A script to automate and manage the migration of files from one PVC to another across OCP clusters.
 
   Steps:
-    - Initialize the PVC migrator environment using the 'init' command.
-    - Deploy the build configuration using the 'build' command.
+    - Make sure your PVC migrator has been built on some namespace in the source and target cluster.
+    - Initialize the PVC migrator environment using the 'init' command and tweak param files to point to your PVC migrator builds.
     - Migrate your PVC(s) using the 'migrate' command.
     - Remove the PVC migrator components from your environment(s) using the 'clean' command.
 
@@ -98,42 +98,34 @@ usage () {
     $0 [options] [commands]
 
   Examples:
-    $0 -n devex-von-image init
-    $0 -n devex-von-image -r https://github.com/WadeBarnes/StorageMigration.git init
+    $0 init -p default
+    $0 migrate -p target
+    $0 migrate -p source
 
-    $0 -e tools migrate jenkins jenkins-data gluster-block 5Gi
-
-  Options:
-  ========
-    -n Project namespace, the name of the target project minus the environment suffix (-tool, -dev, -test, -prod).
-       Used by the 'init' command to set the target project for all subsequent operations.
-
-    -r Optional - GitHub repository URL
-       Used by the 'init' command to set the GitHub for repository for all subsequent build operations.
-       Only used for build operations to redirect the source repository to another fork.
-
-    -b Optional - Git Branch
-       Used by the 'init' command to set the branch of the repository for all subsequent build operations.
-       Only used for build operations to redirect the source repository to another branch of a fork.
+    $0 clean -p target
+    $0 clean -p source
 
   Commands:
   ========
-    init
+    init -p default
       - Initialize the PVC migrator environment for your project environment.
         Specify your project namespace using the -n option.
+      
+      - Required parameters:
+        - profile name: the name of the profile to use when initializing (always "default") for init
 
-    build
-      - Deploy the PVC migrator build configuration.
+    clean -p <profile name>
+      - Cleans out the namespace associated with the profile. Removes all NSPs, deployment configs, etc created by the 
+        migration
+      
+      - Required parameters:
+        - profile name: the name of the profile to clean (always either "target" or "source") for clean
 
-    migrate <hostPodName> <pvcName> <pvcType> <pvcSize>
-      - Migrate files from one PVC to another of the same name.
-        Good for migrating from one storage class to another, or to a new PVC of a different size.
+    migrate -p <profile name>
+      - Deploy the migration container and run the required steps for cross-cluster migration in the relevant cluster
 
       - Required parameters:
-        - hostPodName: The friendly name of the host pod.  Typically, this is the same as the deployment configuration name.
-        - pvcName: The name of the PVC to be migrated.
-        - pvcType: The PVC class to use for the new PVC.  One of gluster-file, gluster-block, or gluster-file-db.
-        - pvcSize: The size, in Gi, for the new PVC, e.g. 1Gi, 2Gi, 5Gi
+        - profile name: the name of the profile to use (always either "target" or "source") for migrate
 
 EOF
 }

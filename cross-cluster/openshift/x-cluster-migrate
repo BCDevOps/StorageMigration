@@ -265,9 +265,9 @@ initialize(){
   read DST_PVC
   echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
 
-  REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
-  REMOVE_PROJECT=${DST_CLUSTER}
+  REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' | sed 's/-/./g' )
   DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+  REMOVE_PROJECT=${DST_CLUSTER}
   SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
   DEPLOYMENT_ENV_NAME=$(echo ${SRC_CLUSTER} | sed 's/.*-//g')
   echo "
@@ -406,7 +406,6 @@ shift
 
 case "${_cmd}" in
   init)
-    # requireProjectNamespace
     initialize
     ;;
   migrate)

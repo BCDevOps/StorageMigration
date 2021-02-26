@@ -9,14 +9,12 @@
 ## Assumptions
 
 `Edit` Access to a pre-existing OpenShift namespace on *Cluster A*
-
-  - deploymentConfig or other application deployment (to be scaled down)
   - Existing PVC (source)
+  - pvc-migrator successfully built in cluster
 
 `Edit` Access to a namespace within *Cluster B*
-
-  - Service account and token with `deployer` access.
   - Pre-Created PVC suited for the destination (size/storageClass/etc)
+  - pvc-migrator successfully built in cluster
 
 [Step Overview](#Step-Overview)
 
@@ -27,10 +25,9 @@
 ## Step Overview
 
 - Confirm pre-requisites (assumptions) have been met.
-- Edit source.env and dest.env files
-- Edit settings.sh file 
-- Run ./x-cluster-migrate
-- After migration, run ./x-cluster-migrate clean
+- initialize project
+- deploy each profile
+- clean up clusters
 
 
 ## Sample Walkthrough
@@ -39,25 +36,41 @@ For this sample, the source/target clusters have been reversed to accomodate pen
 
 ### Detailed Steps:
 
-1. modify variables file (settings.sh)
+#### 1. Copy login commands from clusters.  
 
-**settings.sh:**
-``` bash
-export DST_OCP4=true #whether or not your destination on source cluster is on OCP4
-export SRC_OCP4=false
-export DST_CONTEXT=4a9599-prod/api-silver-devops-gov-bc-ca:6443/wadeking98@github # the full context of dest and source clusters
-export SRC_CONTEXT=devex-von-prod/console-pathfinder-gov-bc-ca:8443/wadeking98
-export DST_PVC=backup-mariadb # name of the source and destination pvcs
-export SRC_PVC=backup
-```
-To find the `DST_CONTEXT` and `SRC_CONTEXT` you have to login to both clusters from the command line. (just copy an paste both login commands into the terminal). Next run `oc config get-contexts` find the contexts with your username and source/destination cluster.
+It is important that you have logged in recently to both clusters from the command line. Go to the web console of each cluster and copy and paste each login command into your terminal.
 
 
-2. Navigate to the openshift folder and run `./x-cluster-migrate`
+#### 2. Initialization  
+~~~
+./x-cluster-migrate init -p default
+~~~
+Follow the prompts on the screen and it should successfully initialize the project.  
+You will have to navigate to `./cross-cluster/openshift/templates/source-pvc-migrator/source-pvc-migrator-deploy.source.local.param` and `./cross-cluster/openshift/templates/target-pvc-migrator/target-pvc-migrator-deploy.target.local.param` and comment out the line that says `SRC_IMAGE_NAMESPACE` or `DST_IMAGE_NAMESPACE` and change it to the namespace of your `pvc-migrator` build.  
+eg:
+~~~
+SRC_IMAGE_NAMESPACE=devex-von-tools
+~~~
+~~~
+DST_IMAGE_NAMESPACE=4a9599-tools
+~~~
 
-Follow the prompts on the screen and it should successfully copy the source pvc to the target
-
-3. After you've verified that the migration completed successfully, run `./x-cluster-migrate clean` to remove the builds, deployments, nsps, etc. that were created during the migration 
+#### 3. Migration
+Now that the param files have been tweaked, we can start the deployment
+~~~
+./x-cluster-migrate migrate -p target
+~~~
+~~~
+./x-cluster-migrate migrate -p source
+~~~
+#### 4. Cleanup
+After the deployment completes, clean up the namespaces
+~~~
+./x-cluster-migrate clean -p target
+~~~
+~~~
+./x-cluster-migrate clean -p source
+~~~
 
 
 ## Database data

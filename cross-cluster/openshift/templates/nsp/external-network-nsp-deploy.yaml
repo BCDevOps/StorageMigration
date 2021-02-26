@@ -1,7 +1,7 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
-  name: "migrate-base-template"
+  name: "pvc-migrator-nsp"
   annotations:
     description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
     tags: storage,migration

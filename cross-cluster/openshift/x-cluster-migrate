@@ -182,6 +182,32 @@ requireDevelopmentEnvName(){
   fi
 }
 
+updateMigratorDeplymentParams() {
+  (
+    _sourcePvc=${1}
+    _targetPvc=${2}
+    _remoteCluster=${3}
+    _remoteProject=${4}
+    _paramFiles=(${5})
+
+    _parameterFilters="/SOURCE_PVC/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/DESTINATION_PVC/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/REMOTE_CLUSTER/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/REMOTE_PROJECT/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}s~\(^SOURCE_PVC=\).*$~\1${_sourcePvc}~;"
+    _parameterFilters="${_parameterFilters}s~\(^DESTINATION_PVC=\).*$~\1${_targetPvc}~;"
+    _parameterFilters="${_parameterFilters}s~\(^REMOTE_CLUSTER=\).*$~\1https://${_remoteCluster}~;"
+    _parameterFilters="${_parameterFilters}s~\(^REMOTE_PROJECT=\).*$~\1${_remoteProject}~;"
+
+    for _paramFile in "${_paramFiles[@]}"
+    do
+      cat ${_paramFile} | sed ${_parameterFilters} > ${_paramFile}.tmp
+      rm ${_paramFile}
+      mv ${_paramFile}.tmp ${_paramFile}
+    done
+  )
+}
+
 initialize(){
   echo -e "\nInitializing environment settings ...\n"
 
@@ -225,14 +251,29 @@ initialize(){
   read DST_PVC
   echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
 
+  REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' )
+  REMOVE_PROJECT=${DST_CLUSTER}
+  DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+  SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+  DEPLOYMENT_ENV_NAME=$(echo ${SRC_CLUSTER} | sed 's/.*-//g')
   echo "
-export REMOTE_CLUSTER=\$(echo \${DST_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$2 }' )
-export REMOTE_PROJECT=\$DST_CLUSTER
-export DST_CLUSTER=\$(echo \${DST_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$1 }' )
-export SRC_CLUSTER=\$(echo \${SRC_CONTEXT} | awk 'BEGIN { FS = \"/\" } ; { print \$1 }' )
-export DEPLOYMENT_ENV_NAME=\$(echo \${SRC_CLUSTER} | sed 's/.*-//g')
+export REMOTE_CLUSTER=${REMOTE_CLUSTER}
+export REMOTE_PROJECT=${REMOVE_PROJECT}
+export DST_CLUSTER=${DST_CLUSTER}
+export SRC_CLUSTER=${SRC_CLUSTER}
+export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
   " >> settings.local.sh
 
+  echo "Generating local param files ..."
+  genTemplateParams.sh -lf -p default
+
+  # rename files to correct profile
+  SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.source.local.param"
+  DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.target.local.param"
+  mv "./templates/source-pvc-migrator/source-pvc-migrator-deploy.local.param" "${SRC_PARAM_NAME}"
+  mv "./templates/target-pvc-migrator/target-pvc-migrator-deploy.local.param" "${DST_PARAM_NAME}"
+
+  updateMigratorDeplymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} "${SRC_PARAM_NAME} ${DST_PARAM_NAME}"
 }
 
 
@@ -246,9 +287,10 @@ targetDeploy(){
   oc config use-context ${CONTEXT}
 
   #build NSP
-  if [ ! -z ${IS_OCP4} ] && [ ${IS_OCP4}=true ]; then
+  if [ ! -z ${IS_OCP4} ] && [ "${IS_OCP4}" = "true" ]; then
     export NAMESPACE_NAME=${CLUSTER}
-    oc apply -f ./templates/external-network-nsp.yaml -n ${CLUSTER}
+    genDepls.sh -p nsp -n ${CLUSTER}
+    exit
   fi
   
   genDepls.sh -p "target" -n "${CONTEXT}"
@@ -279,9 +321,9 @@ sourceDeploy(){
   oc apply -n ${CLUSTER} -f ./tmp.secret
   oc label secret x-cluster-test base=xc-pvc-migrator -n ${CLUSTER}
 
-  if [ ! -z ${IS_OCP4} ] && [ ${IS_OCP4}=true ]; then
+  if [ ! -z ${IS_OCP4} ] && [ "${IS_OCP4}" = "true" ]; then
     export NAMESPACE_NAME=${CLUSTER}
-    oc apply -n ${CLUSTER} -f ./templates/external-network-nsp.yaml
+    genDepls.sh -p nsp -n ${CLUSTER}
   fi
 
   genDepls.sh -p "source" -n "${CLUSTER}"
@@ -324,6 +366,10 @@ cleanEnv(){
 
   oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
   oc delete -l app=pvc-migrator build,buildconfig,is,nsp
+
+  if [ -f "tmp.secret" ] && [ "${PROFILE}" = "target" ]; then
+    rm "tmp.secret"
+  fi
 }
 
 
@@ -350,20 +396,4 @@ case "${_cmd}" in
     globalUsage
     ;;
 esac
-
-# popd >/dev/null
-
-# if [ ! -z "${PARAM}" ] && [ "${PARAM}" = "clean" ]; then
-#   if [ ! -z ${PROFILE} ] && [ "${PROFILE}"="target" ]; then
-#     CONTEXT=${DST_CONTEXT}
-#   elif [ ! -z ${PROFILE} ] && [ "${PROFILE}"="source" ]; then
-#     CONTEXT=${SRC_CONTEXT}
-#   else
-#     printStatusMsg "Please either specifiy target or source profile"
-#     exit
-#   fi
-#   cleanEnv ${CONTEXT} 
-# else
-  
-# fi
 

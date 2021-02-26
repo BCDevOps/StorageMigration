@@ -22,7 +22,7 @@ objects:
 parameters:
   - name: NAME
     description: "Name of the deployment config."
-    value: "pvc-migrator"
+    value: "pvc-migrator-nsp"
   - name: NAMESPACE_NAME
     displayName: Namespace Name
     description: The name of the namespace being deployed to..

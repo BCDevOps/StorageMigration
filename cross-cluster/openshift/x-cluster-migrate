@@ -188,20 +188,34 @@ updateMigratorDeplymentParams() {
     _targetPvc=${2}
     _remoteCluster=${3}
     _remoteProject=${4}
-    _paramFiles=(${5})
+    _sourceCluster=${5}
+    _destCluster=${6}
+    _paramFiles=(${7})
 
     _parameterFilters="/SOURCE_PVC/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/DESTINATION_PVC/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/REMOTE_CLUSTER/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/REMOTE_PROJECT/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/NAMESPACE_NAME/s~^#.~~;"
     _parameterFilters="${_parameterFilters}s~\(^SOURCE_PVC=\).*$~\1${_sourcePvc}~;"
     _parameterFilters="${_parameterFilters}s~\(^DESTINATION_PVC=\).*$~\1${_targetPvc}~;"
     _parameterFilters="${_parameterFilters}s~\(^REMOTE_CLUSTER=\).*$~\1https://${_remoteCluster}~;"
     _parameterFilters="${_parameterFilters}s~\(^REMOTE_PROJECT=\).*$~\1${_remoteProject}~;"
 
+    _sourceParameterFilters="${_parameterFilters}s~\(^NAMESPACE_NAME=\).*$~\1${_sourceCluster}~;"
+    _destParameterFilters="${_parameterFilters}s~\(^NAMESPACE_NAME=\).*$~\1${_destCluster}~;"
+    
+
     for _paramFile in "${_paramFiles[@]}"
     do
-      cat ${_paramFile} | sed ${_parameterFilters} > ${_paramFile}.tmp
+      # check if we're using source or destination param file
+      _filters=${_parameterFilters}
+      if [[ ${_paramFile} == *".nsp-source."* ]]; then
+        _filters=${_sourceParameterFilters}
+      elif [[ ${_paramFile} == *".nsp-target."* ]]; then
+        _filters=${_destParameterFilters}
+      fi
+      cat ${_paramFile} | sed ${_filters} > ${_paramFile}.tmp
       rm ${_paramFile}
       mv ${_paramFile}.tmp ${_paramFile}
     done
@@ -270,33 +284,58 @@ export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
   # rename files to correct profile
   SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.source.local.param"
   DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.target.local.param"
+
   mv "./templates/source-pvc-migrator/source-pvc-migrator-deploy.local.param" "${SRC_PARAM_NAME}"
   mv "./templates/target-pvc-migrator/target-pvc-migrator-deploy.local.param" "${DST_PARAM_NAME}"
 
-  updateMigratorDeplymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} "${SRC_PARAM_NAME} ${DST_PARAM_NAME}"
+  SRC_NSP_PARAM_NAME="./templates/nsp/pvc-migrator-nsp-deploy.nsp-source.local.param"
+  DST_NSP_PARAM_NAME="./templates/nsp/pvc-migrator-nsp-deploy.nsp-target.local.param"
+
+  cp "./templates/nsp/pvc-migrator-nsp-deploy.local.param" "${SRC_NSP_PARAM_NAME}"
+  cp "./templates/nsp/pvc-migrator-nsp-deploy.local.param" "${DST_NSP_PARAM_NAME}"
+  rm "./templates/nsp/pvc-migrator-nsp-deploy.local.param"
+
+  updateMigratorDeplymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} ${SRC_CLUSTER} ${DST_CLUSTER} "${SRC_PARAM_NAME} ${DST_PARAM_NAME} ${SRC_NSP_PARAM_NAME} ${DST_NSP_PARAM_NAME}"
+}
+
+deployToCluster(){
+  _context=${1}
+  _cluster=${2}
+  _isOCP4=${3}
+  _profile=${4}
+
+  # make sure we're using the destination context
+  printStatusMsg "Switching to ${_profile} cluster"
+  oc config use-context ${_context}
+
+  if [ ${_profile} = "source" ]; then
+    oc apply -n ${_cluster} -f ./tmp.secret
+    oc label secret x-cluster-test base=xc-pvc-migrator -n ${_cluster}
+  fi
+
+  #build NSP
+  if [ ! -z ${_isOCP4} ] && [ "${_isOCP4}" = "true" ]; then
+    #need to reload the settings for nsp
+    unset SETTINGS_LOADED
+    genDepls.sh -p "nsp-${_profile}" -n ${_cluster}
+  fi
+  
+  # regenerate settings for deployment
+  unset SETTINGS_LOADED
+  genDepls.sh -p "${_profile}" -n "${_context}"
+
+  printStatusMsg "Monitor the deployment in ${_cluster} console and press ENTER after it completes:"
+  read
+
 }
 
 
 targetDeploy(){
-  CONTEXT=${1}
-  CLUSTER=${2}
-  IS_OCP4=${3}
-  # make sure we're using the destination context
-  printStatusMsg "${CONTEXT} ${CLUSTER} ${IS_OCP4}"
-  printStatusMsg "Switching to destination cluster"
-  oc config use-context ${CONTEXT}
-
-  #build NSP
-  if [ ! -z ${IS_OCP4} ] && [ "${IS_OCP4}" = "true" ]; then
-    export NAMESPACE_NAME=${CLUSTER}
-    genDepls.sh -p nsp -n ${CLUSTER}
-    exit
-  fi
+  _context=${1}
+  _cluster=${2}
+  _isOCP4=${3}
   
-  genDepls.sh -p "target" -n "${CONTEXT}"
-
-  printStatusMsg "Monitor the deployment in ${CLUSTER} console and press ENTER after it completes:"
-  read
+  deployToCluster ${_context} ${_cluster} ${_isOCP4} "target"
 
   MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
 
@@ -305,36 +344,23 @@ targetDeploy(){
 }
 
 sourceDeploy(){
-  CONTEXT=${1}
-  CONTEXT_DST=${2}
-  CLUSTER=${3}
-  IS_OCP4=${4}
+  _context=${1}
+  _contextDst=${2}
+  _cluster=${3}
+  _isOCP4=${4}
   #swtich to source cluster -------------------
   printStatusMsg "Switching to destiantion cluster"
-  oc config use-context ${CONTEXT_DST}
+  oc config use-context ${_contextDst}
 
+  #grab the target pod name
   MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
 
-  printStatusMsg "Switching to source cluster"
-  oc config use-context ${CONTEXT}
-
-  oc apply -n ${CLUSTER} -f ./tmp.secret
-  oc label secret x-cluster-test base=xc-pvc-migrator -n ${CLUSTER}
-
-  if [ ! -z ${IS_OCP4} ] && [ "${IS_OCP4}" = "true" ]; then
-    export NAMESPACE_NAME=${CLUSTER}
-    genDepls.sh -p nsp -n ${CLUSTER}
-  fi
-
-  genDepls.sh -p "source" -n "${CLUSTER}"
-
-  printStatusMsg "Monitor the deployment in ${CLUSTER} console and press ENTER after it completes:"
-  read
+  deployToCluster ${_context} ${_cluster} ${_isOCP4} "source"
 
   MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
   #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
-  oc exec -n ${CLUSTER} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
+  oc exec -n ${_cluster} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
 }
 
 migrate(){
@@ -365,7 +391,8 @@ cleanEnv(){
   oc config use-context ${CONTEXT}
 
   oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
-  oc delete -l app=pvc-migrator build,buildconfig,is,nsp
+  oc delete -l app=pvc-migrator build,buildconfig,is
+  oc delete -l app=pvc-migrator-nsp nsp
 
   if [ -f "tmp.secret" ] && [ "${PROFILE}" = "target" ]; then
     rm "tmp.secret"

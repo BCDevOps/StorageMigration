@@ -1,1 +1,0 @@
-export include_templates="external-network-nsp-deploy"

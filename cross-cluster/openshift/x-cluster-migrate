@@ -107,7 +107,7 @@ usage () {
 
   Commands:
   ========
-    init -p default
+    init -p <profile name>
       - Initialize the PVC migrator environment for your project environment.
         Specify your project namespace using the -n option.
       
@@ -414,4 +414,3 @@ case "${_cmd}" in
     globalUsage
     ;;
 esac
-

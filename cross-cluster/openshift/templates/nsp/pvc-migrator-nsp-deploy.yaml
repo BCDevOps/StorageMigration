@@ -27,4 +27,4 @@ parameters:
     displayName: Namespace Name
     description: The name of the namespace being deployed to..
     required: true
-    value: a99fd4-prod
+    value: a99fd4-tools

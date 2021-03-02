@@ -1,0 +1,10 @@
+#=========================================================
+# OpenShift template parameters for:
+# Component: .
+# Template File: ../openshift/templates/target-pvc-migrator/target-pvc-migrator-deploy.yaml
+#=========================================================
+NAME=target-pvc-migrator
+DESTINATION_PVC=backup
+DST_IMAGE_NAME=pvc-migrator
+DST_IMAGE_NAMESPACE=a99fd4-tools
+DST_IMAGE_REGISTRY=image-registry.openshift-image-registry.svc:5000

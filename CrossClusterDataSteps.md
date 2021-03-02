@@ -10,11 +10,11 @@
 
 `Edit` Access to a pre-existing OpenShift namespace on *Cluster A*
   - Existing PVC (source)
-  - pvc-migrator successfully built in cluster
+  - pvc-migrator successfully built in cluster-tools environment
 
 `Edit` Access to a namespace within *Cluster B*
   - Pre-Created PVC suited for the destination (size/storageClass/etc)
-  - pvc-migrator successfully built in cluster
+  - pvc-migrator successfully built in cluster-tools environment
 
 [Step Overview](#Step-Overview)
 
@@ -43,33 +43,19 @@ It is important that you have logged in recently to both clusters from the comma
 
 #### 2. Initialization  
 ~~~
-./x-cluster-migrate init -p default
+./x-cluster-migrate init
 ~~~
 Follow the prompts on the screen and it should successfully initialize the project.  
-You will have to navigate to `./cross-cluster/openshift/templates/source-pvc-migrator/source-pvc-migrator-deploy.source.local.param` and `./cross-cluster/openshift/templates/target-pvc-migrator/target-pvc-migrator-deploy.target.local.param` and comment out the line that says `SRC_IMAGE_NAMESPACE` or `DST_IMAGE_NAMESPACE` and change it to the namespace of your `pvc-migrator` build.  
-eg:
-~~~
-SRC_IMAGE_NAMESPACE=devex-von-tools
-~~~
-~~~
-DST_IMAGE_NAMESPACE=4a9599-tools
-~~~
 
 #### 3. Migration
 Now that the param files have been tweaked, we can start the deployment
 ~~~
-./x-cluster-migrate migrate -p target
-~~~
-~~~
-./x-cluster-migrate migrate -p source
+./x-cluster-migrate migrate
 ~~~
 #### 4. Cleanup
 After the deployment completes, clean up the namespaces
 ~~~
-./x-cluster-migrate clean -p target
-~~~
-~~~
-./x-cluster-migrate clean -p source
+./x-cluster-migrate clean
 ~~~
 
 

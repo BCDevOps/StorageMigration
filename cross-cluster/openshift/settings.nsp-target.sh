@@ -1,1 +1,0 @@
-export include_templates="pvc-migrator-nsp-deploy"

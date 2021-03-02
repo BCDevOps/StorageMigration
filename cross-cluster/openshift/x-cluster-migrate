@@ -1,6 +1,43 @@
 #!/bin/bash
+usage () {
+  cat <<-EOF
+
+  A script to automate and manage the migration of files from one PVC to another across OCP clusters.
+
+  Steps:
+    - Make sure your PVC migrator has been built on some namespace in the source and target cluster.
+    - Initialize the PVC migrator environment using the 'init' command and tweak param files to point to your PVC migrator builds.
+    - Migrate your PVC(s) using the 'migrate' command.
+    - Remove the PVC migrator components from your environment(s) using the 'clean' command.
+
+  Usage:
+    $0 [options] [commands]
+
+  Examples:
+    $0 init -p default
+    $0 migrate -p target
+    $0 migrate -p source
+
+    $0 clean -p target
+    $0 clean -p source
+
+  Commands:
+  ========
+    init
+      - Initialize the PVC migrator environment for your project environment.
+        Specify your project namespace using the -n option.
+
+    clean -e <env name>
+      - Cleans out the namespace associated with the profile. Removes all NSPs, deployment configs, etc created by the 
+        migration
+
+    migrate
+      - Deploy the migration container and run the required steps for cross-cluster migration in the relevant cluster
+
+EOF
+}
+
 SCRIPT_HOME="$( cd "$( dirname "$0" )" && pwd )"
-export APPLY_LOCAL_SETTINGS=1
 
 # =================================================================================================================
 # Process the local command line arguments and pass everything else along.
@@ -49,7 +86,6 @@ onUsesCommandLineArguments() {
 # the environment variable APPLY_LOCAL_SETTING set to 1.
 # Similarly, if the environment variable is not set, the initialize script will NOT
 # correctly create the local settings file
-touch settings.local.sh
 
 
 
@@ -83,52 +119,7 @@ else
 fi
 
 
-usage () {
-  cat <<-EOF
 
-  A script to automate and manage the migration of files from one PVC to another across OCP clusters.
-
-  Steps:
-    - Make sure your PVC migrator has been built on some namespace in the source and target cluster.
-    - Initialize the PVC migrator environment using the 'init' command and tweak param files to point to your PVC migrator builds.
-    - Migrate your PVC(s) using the 'migrate' command.
-    - Remove the PVC migrator components from your environment(s) using the 'clean' command.
-
-  Usage:
-    $0 [options] [commands]
-
-  Examples:
-    $0 init -p default
-    $0 migrate -p target
-    $0 migrate -p source
-
-    $0 clean -p target
-    $0 clean -p source
-
-  Commands:
-  ========
-    init -p default
-      - Initialize the PVC migrator environment for your project environment.
-        Specify your project namespace using the -n option.
-      
-      - Required parameters:
-        - profile name: the name of the profile to use when initializing (always "default") for init
-
-    clean -p <profile name>
-      - Cleans out the namespace associated with the profile. Removes all NSPs, deployment configs, etc created by the 
-        migration
-      
-      - Required parameters:
-        - profile name: the name of the profile to clean (always either "target" or "source") for clean
-
-    migrate -p <profile name>
-      - Deploy the migration container and run the required steps for cross-cluster migration in the relevant cluster
-
-      - Required parameters:
-        - profile name: the name of the profile to use (always either "target" or "source") for migrate
-
-EOF
-}
 
 deploymentEnvNameSet() {
   echo "${DEPLOYMENT_ENV_NAME}"
@@ -184,15 +175,22 @@ updateMigratorDeplymentParams() {
     _destCluster=${6}
     _paramFiles=(${7})
 
+    _destTools=$(echo ${_destCluster} | sed 's/-[[:alnum:]]*$//g')-tools
+    _sourceTools=$(echo ${_sourceCluster} | sed 's/-[[:alnum:]]*$//g')-tools
+
     _parameterFilters="/SOURCE_PVC/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/DESTINATION_PVC/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/REMOTE_CLUSTER/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/REMOTE_PROJECT/s~^#.~~;"
     _parameterFilters="${_parameterFilters}/NAMESPACE_NAME/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/DST_IMAGE_NAMESPACE/s~^#.~~;"
+    _parameterFilters="${_parameterFilters}/SRC_IMAGE_NAMESPACE/s~^#.~~;"
     _parameterFilters="${_parameterFilters}s~\(^SOURCE_PVC=\).*$~\1${_sourcePvc}~;"
     _parameterFilters="${_parameterFilters}s~\(^DESTINATION_PVC=\).*$~\1${_targetPvc}~;"
     _parameterFilters="${_parameterFilters}s~\(^REMOTE_CLUSTER=\).*$~\1https://${_remoteCluster}~;"
     _parameterFilters="${_parameterFilters}s~\(^REMOTE_PROJECT=\).*$~\1${_remoteProject}~;"
+    _parameterFilters="${_parameterFilters}s~\(^DST_IMAGE_NAMESPACE=\).*$~\1${_destTools}~;"
+    _parameterFilters="${_parameterFilters}s~\(^SRC_IMAGE_NAMESPACE=\).*$~\1${_sourceTools}~;"
 
     _sourceParameterFilters="${_parameterFilters}s~\(^NAMESPACE_NAME=\).*$~\1${_sourceCluster}~;"
     _destParameterFilters="${_parameterFilters}s~\(^NAMESPACE_NAME=\).*$~\1${_destCluster}~;"
@@ -218,44 +216,44 @@ initialize(){
   echo -e "\nInitializing environment settings ...\n"
 
   # Write a local settings file ...
-  echo "Writing local settings file (settings.local.sh) ..."
-  echo "export GIT_URI=${GIT_URI}" > settings.local.sh
-  echo "export GIT_REF=${GIT_REF}" >> settings.local.sh
+  echo "Writing local settings file (settings.sh) ..."
+  echo "export GIT_URI=${GIT_URI}" > settings.sh
+  echo "export GIT_REF=${GIT_REF}" >> settings.sh
 
   oc config get-contexts | sed 's/*/ /g' | awk '{print $1}' | sed '1 d'
   printStatusMsg "Please enter your destination cluster from the list above:"
   read DST_CONTEXT
-  echo "export DST_CONTEXT=${DST_CONTEXT}" >> settings.local.sh
+  echo "export DST_CONTEXT=${DST_CONTEXT}" >> settings.sh
 
-  printStatusMsg "Is your destination cluster on OpenShift Platform 4? (yes/no):"
-  read DST_OCP4_RESP
-  if [ "${DST_OCP4_RESP}" = "yes" ]; then 
-    DST_OCP4=true 
-  else 
-    DST_OCP4=false 
-  fi
-  echo "export DST_OCP4=${DST_OCP4}" >> settings.local.sh
+  # printStatusMsg "Is your destination cluster on OpenShift Platform 4? (yes/no):"
+  # read DST_OCP4_RESP
+  # if [ "${DST_OCP4_RESP}" = "yes" ]; then 
+  #   DST_OCP4=true 
+  # else 
+  #   DST_OCP4=false 
+  # fi
+  # echo "export DST_OCP4=${DST_OCP4}" >> settings.sh
 
   printStatusMsg "Please enter your source cluster from the list above:"
   read SRC_CONTEXT
-  echo "export SRC_CONTEXT=${SRC_CONTEXT}" >> settings.local.sh
+  echo "export SRC_CONTEXT=${SRC_CONTEXT}" >> settings.sh
 
-  printStatusMsg "Is your source cluster on OpenShift Platform 4? (yes/no):"
-  read SRC_OCP4_RESP
-  if [ "${SRC_OCP4_RESP}" = "yes" ]; then 
-    SRC_OCP4=true 
-  else 
-    SRC_OCP4=false 
-  fi
-  echo "export SRC_OCP4=${SRC_OCP4}" >> settings.local.sh
+  # printStatusMsg "Is your source cluster on OpenShift Platform 4? (yes/no):"
+  # read SRC_OCP4_RESP
+  # if [ "${SRC_OCP4_RESP}" = "yes" ]; then 
+  #   SRC_OCP4=true 
+  # else 
+  #   SRC_OCP4=false 
+  # fi
+  # echo "export SRC_OCP4=${SRC_OCP4}" >> settings.sh
 
   printStatusMsg "Please enter your source PVC"
   read SRC_PVC
-  echo "export SRC_PVC=${SRC_PVC}" >> settings.local.sh
+  echo "export SRC_PVC=${SRC_PVC}" >> settings.sh
 
   printStatusMsg "Please enter your destination PVC"
   read DST_PVC
-  echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
+  echo "export DST_PVC=${DST_PVC}" >> settings.sh
 
   REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' | sed 's/-/./g' )
   DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
@@ -268,33 +266,24 @@ export REMOTE_PROJECT=${REMOVE_PROJECT}
 export DST_CLUSTER=${DST_CLUSTER}
 export SRC_CLUSTER=${SRC_CLUSTER}
 export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
-  " >> settings.local.sh
+  " >> settings.sh
 
-  echo "Generating local param files ..."
-  genTemplateParams.sh -lf -p default
+  echo "Generating param files ..."
+  genTemplateParams.sh -f -p default
 
   # rename files to correct profile
-  SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.source.local.param"
-  DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.target.local.param"
+  SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.param"
+  DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.param"
 
-  mv "./templates/source-pvc-migrator/source-pvc-migrator-deploy.local.param" "${SRC_PARAM_NAME}"
-  mv "./templates/target-pvc-migrator/target-pvc-migrator-deploy.local.param" "${DST_PARAM_NAME}"
+  
 
-  SRC_NSP_PARAM_NAME="./templates/nsp/pvc-migrator-nsp-deploy.nsp-source.local.param"
-  DST_NSP_PARAM_NAME="./templates/nsp/pvc-migrator-nsp-deploy.nsp-target.local.param"
-
-  cp "./templates/nsp/pvc-migrator-nsp-deploy.local.param" "${SRC_NSP_PARAM_NAME}"
-  cp "./templates/nsp/pvc-migrator-nsp-deploy.local.param" "${DST_NSP_PARAM_NAME}"
-  rm "./templates/nsp/pvc-migrator-nsp-deploy.local.param"
-
-  updateMigratorDeplymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} ${SRC_CLUSTER} ${DST_CLUSTER} "${SRC_PARAM_NAME} ${DST_PARAM_NAME} ${SRC_NSP_PARAM_NAME} ${DST_NSP_PARAM_NAME}"
+  updateMigratorDeplymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} ${SRC_CLUSTER} ${DST_CLUSTER} "${SRC_PARAM_NAME} ${DST_PARAM_NAME}"
 }
 
 deployToCluster(){
   _context=${1}
   _cluster=${2}
-  _isOCP4=${3}
-  _profile=${4}
+  _profile=${3}
 
   # make sure we're using the destination context
   printStatusMsg "Switching to ${_profile} cluster"
@@ -304,17 +293,10 @@ deployToCluster(){
     oc apply -n ${_cluster} -f ./tmp.secret
     oc label secret x-cluster-test base=xc-pvc-migrator -n ${_cluster}
   fi
-
-  #build NSP
-  if [ ! -z ${_isOCP4} ] && [ "${_isOCP4}" = "true" ]; then
-    #need to reload the settings for nsp
-    unset SETTINGS_LOADED
-    genDepls.sh -p "nsp-${_profile}" -n ${_cluster}
-  fi
   
   # regenerate settings for deployment
   unset SETTINGS_LOADED
-  genDepls.sh -p "${_profile}" -n "${_context}"
+  genDepls.sh -c "${_profile}"-pvc-migrator -n "${_context}"
 
   printStatusMsg "Monitor the deployment in ${_cluster} console and press ENTER after it completes:"
   read
@@ -325,9 +307,8 @@ deployToCluster(){
 targetDeploy(){
   _context=${1}
   _cluster=${2}
-  _isOCP4=${3}
   
-  deployToCluster ${_context} ${_cluster} ${_isOCP4} "target"
+  deployToCluster ${_context} ${_cluster} "target"
 
   MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
 
@@ -339,7 +320,6 @@ sourceDeploy(){
   _context=${1}
   _contextDst=${2}
   _cluster=${3}
-  _isOCP4=${4}
   #swtich to source cluster -------------------
   printStatusMsg "Switching to destiantion cluster"
   oc config use-context ${_contextDst}
@@ -347,7 +327,7 @@ sourceDeploy(){
   #grab the target pod name
   MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
 
-  deployToCluster ${_context} ${_cluster} ${_isOCP4} "source"
+  deployToCluster ${_context} ${_cluster} "source"
 
   MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
@@ -356,21 +336,16 @@ sourceDeploy(){
 }
 
 migrate(){
-  if [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "target" ]; then
-    targetDeploy ${DST_CONTEXT} ${DST_CLUSTER} ${DST_OCP4}
-  elif [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "source" ]; then
-    sourceDeploy ${SRC_CONTEXT} ${DST_CONTEXT} ${SRC_CLUSTER} ${SRC_OCP4}
-  else
-    printStatusMsg "Please either specifiy target or source profile"
-    exit
-  fi
+    targetDeploy ${DST_CONTEXT} ${DST_CLUSTER}
+    sourceDeploy ${SRC_CONTEXT} ${DST_CONTEXT} ${SRC_CLUSTER}
 }
 
 cleanEnv(){
-  if [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "target" ]; then
-    CONTEXT=${DST_CONTEXT}
-  elif [ ! -z ${PROFILE} ] && [ "${PROFILE}" = "source" ]; then
-    CONTEXT=${SRC_CONTEXT}
+  _profile=${1}
+  if [ ! -z ${_profile} ] && [ "${_profile}" = "target" ]; then
+    _context=${DST_CONTEXT}
+  elif [ ! -z ${_profile} ] && [ "${_profile}" = "source" ]; then
+    _context=${SRC_CONTEXT}
   else
     printStatusMsg "Please either specifiy target or source profile"
     exit
@@ -380,15 +355,20 @@ cleanEnv(){
 
   # make sure we're using the destination context
   printStatusMsg "Switching to destination cluster"
-  oc config use-context ${CONTEXT}
+  oc config use-context ${_context}
 
   oc delete -l base=xc-pvc-migrator deployment,sa,rolebinding,secret
   oc delete -l app=pvc-migrator build,buildconfig,is
   oc delete -l app=pvc-migrator-nsp nsp
 
-  if [ -f "tmp.secret" ] && [ "${PROFILE}" = "target" ]; then
+  if [ -f "tmp.secret" ] && [ "${_profile}" = "target" ]; then
     rm "tmp.secret"
   fi
+}
+
+cleanAllEnv(){
+  cleanEnv "target"
+  cleanEnv "source"
 }
 
 
@@ -401,12 +381,10 @@ case "${_cmd}" in
     initialize
     ;;
   migrate)
-    requireDevelopmentEnvName
     migrate
     ;;
   clean)
-    requireDevelopmentEnvName
-    cleanEnv
+    cleanAllEnv
     ;;
 
   *)

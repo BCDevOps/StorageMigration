@@ -14,12 +14,9 @@ usage () {
     $0 [options] [commands]
 
   Examples:
-    $0 init -p default
-    $0 migrate -p target
-    $0 migrate -p source
-
-    $0 clean -p target
-    $0 clean -p source
+    $0 init
+    $0 migrate
+    $0 clean
 
   Commands:
   ========
@@ -27,7 +24,7 @@ usage () {
       - Initialize the PVC migrator environment for your project environment.
         Specify your project namespace using the -n option.
 
-    clean -e <env name>
+    clean
       - Cleans out the namespace associated with the profile. Removes all NSPs, deployment configs, etc created by the 
         migration
 
@@ -392,4 +389,3 @@ case "${_cmd}" in
     globalUsage
     ;;
 esac
-

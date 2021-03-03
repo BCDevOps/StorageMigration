@@ -202,7 +202,6 @@ updateMigratorDeplymentParams() {
       elif [[ ${_paramFile} == *".nsp-target."* ]]; then
         _filters=${_destParameterFilters}
       fi
-      printStatusMsg ${_filters}
       cat ${_paramFile} | sed ${_filters} > ${_paramFile}.tmp
       rm ${_paramFile}
       mv ${_paramFile}.tmp ${_paramFile}

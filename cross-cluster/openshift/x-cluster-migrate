@@ -35,7 +35,7 @@ EOF
 }
 
 SCRIPT_HOME="$( cd "$( dirname "$0" )" && pwd )"
-
+export APPLY_LOCAL_SETTINGS=1
 # =================================================================================================================
 # Process the local command line arguments and pass everything else along.
 # - The 'getopts' options string must start with ':' for this to work.
@@ -83,7 +83,7 @@ onUsesCommandLineArguments() {
 # the environment variable APPLY_LOCAL_SETTING set to 1.
 # Similarly, if the environment variable is not set, the initialize script will NOT
 # correctly create the local settings file
-
+touch settings.local.sh
 
 
 _includeFile="ocFunctions.inc"
@@ -202,6 +202,7 @@ updateMigratorDeplymentParams() {
       elif [[ ${_paramFile} == *".nsp-target."* ]]; then
         _filters=${_destParameterFilters}
       fi
+      printStatusMsg ${_filters}
       cat ${_paramFile} | sed ${_filters} > ${_paramFile}.tmp
       rm ${_paramFile}
       mv ${_paramFile}.tmp ${_paramFile}
@@ -213,14 +214,14 @@ initialize(){
   echo -e "\nInitializing environment settings ...\n"
 
   # Write a local settings file ...
-  echo "Writing local settings file (settings.sh) ..."
-  echo "export GIT_URI=${GIT_URI}" > settings.sh
-  echo "export GIT_REF=${GIT_REF}" >> settings.sh
+  echo "Writing local settings file (settings.local.sh) ..."
+  echo "export GIT_URI=${GIT_URI}" > settings.local.sh
+  echo "export GIT_REF=${GIT_REF}" >> settings.local.sh
 
   oc config get-contexts | sed 's/*/ /g' | awk '{print $1}' | sed '1 d'
   printStatusMsg "Please enter your destination cluster from the list above:"
   read DST_CONTEXT
-  echo "export DST_CONTEXT=${DST_CONTEXT}" >> settings.sh
+  echo "export DST_CONTEXT=${DST_CONTEXT}" >> settings.local.sh
 
   # printStatusMsg "Is your destination cluster on OpenShift Platform 4? (yes/no):"
   # read DST_OCP4_RESP
@@ -233,7 +234,7 @@ initialize(){
 
   printStatusMsg "Please enter your source cluster from the list above:"
   read SRC_CONTEXT
-  echo "export SRC_CONTEXT=${SRC_CONTEXT}" >> settings.sh
+  echo "export SRC_CONTEXT=${SRC_CONTEXT}" >> settings.local.sh
 
   # printStatusMsg "Is your source cluster on OpenShift Platform 4? (yes/no):"
   # read SRC_OCP4_RESP
@@ -246,11 +247,11 @@ initialize(){
 
   printStatusMsg "Please enter your source PVC"
   read SRC_PVC
-  echo "export SRC_PVC=${SRC_PVC}" >> settings.sh
+  echo "export SRC_PVC=${SRC_PVC}" >> settings.local.sh
 
   printStatusMsg "Please enter your destination PVC"
   read DST_PVC
-  echo "export DST_PVC=${DST_PVC}" >> settings.sh
+  echo "export DST_PVC=${DST_PVC}" >> settings.local.sh
 
   REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' | sed 's/-/./g' )
   DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
@@ -263,14 +264,14 @@ export REMOTE_PROJECT=${REMOVE_PROJECT}
 export DST_CLUSTER=${DST_CLUSTER}
 export SRC_CLUSTER=${SRC_CLUSTER}
 export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
-  " >> settings.sh
+  " >> settings.local.sh
 
   echo "Generating param files ..."
-  genTemplateParams.sh -f -p default
+  genTemplateParams.sh -lf -p default
 
   # rename files to correct profile
-  SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.param"
-  DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.param"
+  SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.local.param"
+  DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.local.param"
 
   
 

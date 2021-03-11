@@ -275,7 +275,8 @@ deployToCluster(){
   
   # regenerate settings for deployment
   unset SETTINGS_LOADED
-  genDepls.sh -c "${_profile}"-pvc-migrator -n "${_context}"
+  _namespace=$(echo ${_context} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
+  genDepls.sh -c "${_profile}"-pvc-migrator -n "${_namespace}"
 
   printStatusMsg "Monitor the deployment in ${_cluster} console and press ENTER after it completes:"
   read

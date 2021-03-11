@@ -290,10 +290,10 @@ targetDeploy(){
   
   deployToCluster ${_context} ${_cluster} "target"
 
-  MIG_TOKEN_SECRET=`oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}'`
+  MIG_TOKEN_SECRET=$(oc get secret | grep target-pvc-migrator-token | head -1 | awk '{print $1}')
 
   # Use token value to generate local temp secret
-  oc create secret generic x-cluster-test --from-literal=token=`oc get secret ${MIG_TOKEN_SECRET} -o json | jq -r .data.token | base64 -d` --dry-run -o json > tmp.secret
+  oc create secret generic x-cluster-test --from-literal=token=$(oc get secret ${MIG_TOKEN_SECRET} -o json | jq -r .data.token | base64 -di) --dry-run -o json > tmp.secret
 }
 
 sourceDeploy(){
@@ -301,18 +301,23 @@ sourceDeploy(){
   _contextDst=${2}
   _cluster=${3}
   #swtich to source cluster -------------------
-  printStatusMsg "Switching to destiantion cluster"
+  printStatusMsg "Switching to destination cluster"
   oc config use-context ${_contextDst}
 
-  #grab the target pod name
+  #grab the pvc-migrator pod name
   MIG_POD_TARGET=$(oc get pods | grep target-pvc-migrator | awk '{print $1}')
 
   deployToCluster ${_context} ${_cluster} "source"
 
   MIG_POD=$(oc get pods | grep source-pvc-migrator | awk '{print $1}')
 
+  # on Windows, the command needs to be prefixed by winpty
+  if [ "$OSTYPE" == "msys" ]; then
+    CMD_PREFIX="winpty"
+  fi
+
   #runInContainer doesn't allow us to specify -n or our env, we have to use this instead
-  oc exec -n ${_cluster} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
+  $CMD_PREFIX oc exec -n ${_cluster} -it "${MIG_POD}" -- bash -c "cd /source; oc rsync --compress=true --kubeconfig=/target/tkube/KUBECONFIG . ${MIG_POD_TARGET}:/target"
 }
 
 migrate(){
@@ -333,8 +338,8 @@ cleanEnv(){
 
   printStatusMsg "Cleaning secrets, deployments, builds, etc"
 
-  # make sure we're using the destination context
-  printStatusMsg "Switching to destination cluster"
+  # make sure we're using the right context
+  printStatusMsg "Switching to ${_profile} cluster"
   oc config use-context ${_context}
   _namespace=$(echo ${_context} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
 

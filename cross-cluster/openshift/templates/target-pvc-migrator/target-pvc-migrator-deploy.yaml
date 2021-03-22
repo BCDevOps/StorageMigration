@@ -67,7 +67,7 @@ parameters:
 - name: DESTINATION_PVC
   description: "Name of an existing PVC to use as the content destination."
   required: true
-  value: backup-mariadb1
+  value: backup
 - name: DST_IMAGE_NAME
   displayName: Container Image Name
   description: The name of the image to use for this resource.

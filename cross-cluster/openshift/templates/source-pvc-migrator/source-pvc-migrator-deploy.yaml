@@ -5,43 +5,6 @@ metadata:
   annotations:
     description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
     tags: storage,migration
-parameters:
-- name: NAME
-  description: "Name of the deployment."
-  value: "source-pvc-migrator"
-- name: SOURCE_PVC
-  description: "Name of an existing PVC to use as the content destination."
-  required: true
-- name: REMOTE_CLUSTER
-  displayName: Remote Cluster API URL
-  description: The URL of the remote cluster API (including port)
-  required: true
-- name: REMOTE_PROJECT
-  displayName: Remote Namespace
-  description: The name of the remote namespace (project)
-  required: true
-- name: REMOTE_SECRET
-  displayName: Remote Cluster token secret
-  description: The name of the secret that contains an access token
-  required: true
-- name: SRC_IMAGE_NAME
-  displayName: Container Image Name
-  description: The name of the image to use for this resource.
-  required: true
-  value: pvc-migrator
-- name: SRC_IMAGE_NAMESPACE
-  displayName: Image Namespace
-  description: The namespace of the OpenShift project containing the imagestream for the application.
-  required: true
-  value: bcgov
-- name: SRC_IMAGE_REGISTRY
-  #ocp3#docker-registry.default.svc:5000
-  value: docker-registry.default.svc:5000
-- name: TAG_NAME
-  displayName: Environment TAG name
-  description: The TAG name for this environment, e.g., dev, test, prod
-  required: true
-  value: dev
 objects:
 - apiVersion: apps/v1
   kind: Deployment
@@ -94,4 +57,39 @@ objects:
             claimName: ${SOURCE_PVC}
         - name: target
           emptyDir: {}
-
+parameters:
+- name: NAME
+  description: "Name of the deployment."
+  value: "source-pvc-migrator"
+- name: SOURCE_PVC
+  description: "Name of an existing PVC to use as the content destination."
+  required: true
+  value: backup
+- name: REMOTE_CLUSTER
+  displayName: Remote Cluster API URL
+  description: The URL of the remote cluster API (including port)
+  required: true
+  value: https://api.silver.devops.gov.bc.ca:6443
+- name: REMOTE_PROJECT
+  displayName: Remote Namespace
+  description: The name of the remote namespace (project)
+  required: true
+  value: 4a9599-prod
+- name: REMOTE_SECRET
+  displayName: Remote Cluster token secret
+  description: The name of the secret that contains an access token
+  required: true
+  value: x-cluster-test
+- name: SRC_IMAGE_NAME
+  displayName: Container Image Name
+  description: The name of the image to use for this resource.
+  required: true
+  value: pvc-migrator
+- name: SRC_IMAGE_NAMESPACE
+  displayName: Image Namespace
+  description: The namespace of the OpenShift project containing the imagestream for the application.
+  required: true
+  value: devex-von-prod
+- name: SRC_IMAGE_REGISTRY
+  #ocp3#docker-registry.default.svc:5000
+  value: docker-registry.default.svc:5000

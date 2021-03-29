@@ -5,34 +5,6 @@ metadata:
   annotations:
     description: "Template to create a runnable pod intended to copy storage content from one PVC to another."
     tags: storage,migration
-parameters:
-- name: NAME
-  description: "Name of the deployment config."
-  value: "pvc-migrator"
-- name: SOURCE_PVC
-  description: "Name of an existing PVC to use as the content source."
-  required: true
-- name: TARGET_PVC
-  description: "Name of an existing PVC to use as the content target."
-  required: true
-- name: SLEEP_DURATION
-  description: "Value for the sleep command to keep the migration pod alive."
-  value: "1d"
-- name: SOURCE_IMAGE_NAME
-  displayName: Source Image Name
-  description: The name of the image to use for this resource.
-  required: true
-  value: pvc-migrator
-- name: SOURCE_IMAGE_NAMESPACE
-  displayName: Image Namespace
-  description: The namespace of the OpenShift project containing the imagestream for the application.
-  required: true
-  value: bcgov
-- name: TAG_NAME
-  displayName: Environment TAG name
-  description: The TAG name for this environment, e.g., dev, test, prod
-  required: true
-  value: dev
 objects:
 - apiVersion: v1
   kind: DeploymentConfig
@@ -96,3 +68,31 @@ objects:
           name: ${SOURCE_IMAGE_NAME}:${TAG_NAME}
           namespace: ${SOURCE_IMAGE_NAMESPACE}
       type: ImageChange
+parameters:
+- name: NAME
+  description: "Name of the deployment config."
+  value: "pvc-migrator"
+- name: SOURCE_PVC
+  description: "Name of an existing PVC to use as the content source."
+  required: true
+- name: TARGET_PVC
+  description: "Name of an existing PVC to use as the content target."
+  required: true
+- name: SLEEP_DURATION
+  description: "Value for the sleep command to keep the migration pod alive."
+  value: "1d"
+- name: SOURCE_IMAGE_NAME
+  displayName: Source Image Name
+  description: The name of the image to use for this resource.
+  required: true
+  value: pvc-migrator
+- name: SOURCE_IMAGE_NAMESPACE
+  displayName: Image Namespace
+  description: The namespace of the OpenShift project containing the imagestream for the application.
+  required: true
+  value: bcgov
+- name: TAG_NAME
+  displayName: Environment TAG name
+  description: The TAG name for this environment, e.g., dev, test, prod
+  required: true
+  value: dev

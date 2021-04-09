@@ -236,12 +236,12 @@ initialize(){
 
   REMOTE_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $2 }' | sed 's/-/./g' )
   DST_CLUSTER=$(echo ${DST_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
-  REMOVE_PROJECT=${DST_CLUSTER}
+  REMOTE_PROJECT=${DST_CLUSTER}
   SRC_CLUSTER=$(echo ${SRC_CONTEXT} | awk 'BEGIN { FS = "/" } ; { print $1 }' )
   DEPLOYMENT_ENV_NAME=$(echo ${SRC_CLUSTER} | sed 's/.*-//g')
   echo "
 export REMOTE_CLUSTER=${REMOTE_CLUSTER}
-export REMOTE_PROJECT=${REMOVE_PROJECT}
+export REMOTE_PROJECT=${REMOTE_PROJECT}
 export DST_CLUSTER=${DST_CLUSTER}
 export SRC_CLUSTER=${SRC_CLUSTER}
 export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
@@ -254,7 +254,7 @@ export DEPLOYMENT_ENV_NAME=${DEPLOYMENT_ENV_NAME}
   SRC_PARAM_NAME="./templates/source-pvc-migrator/source-pvc-migrator-deploy.local.param"
   DST_PARAM_NAME="./templates/target-pvc-migrator/target-pvc-migrator-deploy.local.param"
 
-  
+
 
   updateMigratorDeploymentParams ${SRC_PVC} ${DST_PVC} ${REMOTE_CLUSTER} ${REMOTE_PROJECT} ${SRC_CLUSTER} ${DST_CLUSTER} "${SRC_PARAM_NAME} ${DST_PARAM_NAME}"
 }

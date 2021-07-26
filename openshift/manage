@@ -132,7 +132,7 @@ onUsesCommandLineArguments() {
 # -----------------------------------------------------------------------------------------------------------------
 
 # An empty settings.local.sh is required for the scripts to run correctly during the first run.
-# If no settings.local.sh is provided, the initialization above will fail due to 
+# If no settings.local.sh is provided, the initialization above will fail due to
 # the environment variable APPLY_LOCAL_SETTING set to 1.
 # Similarly, if the environment variable is not set, the initialize script will NOT
 # correctly create the local settings file
@@ -186,7 +186,7 @@ migrate(){
     printAndWait "Wait for the ${_tmpPvcName} PVC to be created before continuing."
 
     # Deploy the migrator pod
-    updateMigratorDeplymentParams "./templates/pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
+    updateMigratorDeplymentParams "./templates/pvc-migrator/pvc-migrator-deploy.local.param" "${_pvcName}" "${_tmpPvcName}" "latest"
     deployMigrator ${_migratorPodName}
     scaleUp ${_migratorPodName}
     printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
@@ -243,7 +243,7 @@ copy(){
     printAndWait "Make sure there are no running pods connected to the source and target PVCs."
 
     # Deploy the migrator pod
-    updateMigratorDeplymentParams "./templates/pvc-migrator-deploy.local.param" "${_sourcePvcName}" "${_targetPvcName}" "latest"
+    updateMigratorDeplymentParams "./templates/pvc-migrator/pvc-migrator-deploy.local.param" "${_sourcePvcName}" "${_targetPvcName}" "latest"
     deployMigrator ${_migratorPodName}
     scaleUp ${_migratorPodName}
     printAndWait "Wait for the ${_migratorPodName} pod to completely startup before continuing."
@@ -262,7 +262,7 @@ copy(){
 
 updateMigratorDeplymentParams() {
   (
-    _paramFile=${1:-./templates/pvc-migrator-deploy.local.param}
+    _paramFile=${1:-./templates/pvc-migrator/pvc-migrator-deploy.local.param}
     _sourcePvc=${2}
     _targetPvc=${3}
     _imageTag=${4:-"latest"}
@@ -288,10 +288,12 @@ deployMigrator(){
 
     # Deploy or update the configuration ...
     if dcExists ${_migratorName}; then
-      genDepls.sh -u -l
+      unset SETTINGS_LOADED
+      genDepls.sh -c pvc-migrator -u -l
     else
-      genDepls.sh -l
-    fi 
+      unset SETTINGS_LOADED
+      genDepls.sh -c pvc-migrator -l
+    fi
 
     oc rollout latest dc/${_migratorName} -n $(getProjectName)
   )
@@ -417,7 +419,8 @@ initialize(){
 
   # Generate local params files ...
   echo "Generating local param files ..."
-  genTemplateParams.sh -lf
+  unset SETTINGS_LOADED
+  genTemplateParams.sh -c pvc-migrator -l -f
 
   echo "Environment settings:"
   echo "  Project namespace: ${PROJECT_NAMESPACE}"
